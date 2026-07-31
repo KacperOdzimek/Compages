@@ -1,0 +1,16 @@
+*
+
+!.gitattributes
+!.gitignore
+
+!README.md
+!LICENSE.md
+
+!include/
+!include/**
+
+!shaders/
+!shaders/**
+
+!formats
+!formats/**
