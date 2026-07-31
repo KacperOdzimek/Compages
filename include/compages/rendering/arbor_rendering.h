@@ -1,53 +1,59 @@
-#ifndef DEMIURG_ARBOR_RENDERING_H
-#define DEMIURG_ARBOR_RENDERING_H
+#ifndef COMPAGES_ARBOR_RENDERING_H
+#define COMPAGES_ARBOR_RENDERING_H
 
 // ===========================
 // Header Depedency
 
 #include "arbor/arbor.h"
 #include "demiurg/platform/graphics.h"
+#include "compages/resources/font.h"
 #include <stdint.h>
 
 // ===========================
 // Implementation Injections - User define those functions
 // Functions shall return non-zero at successful find
 
-int dui_injection_query_image_texture(const char* image, dgx_texture** texture_out, arb_uv_2d* uv_out);
-int dui_injection_query_font_texture(const char* font, dgx_texture** texture_out);
+int cmg_abr_injection_query_image(const char* image, dgx_texture** texture_out, dgx_uv_2d* uv_out);
+int cmg_abr_injection_query_font(const char* font, cmg_fnt_font** font_out);
+
+// ===========================
+// Text Layout
+
+arb_text_layout_func_signature cmg_abr_text_layout_func;
 
 // ===========================
 // Shared
 
-typedef struct dar_shared_create_info {
+typedef struct cmg_abr_shared_create_info {
     dgx_pipeline_attachment_state   attachment_state;
     dgx_shader_create_info          vertex_shader_info;
     dgx_shader_create_info          pixel_shader_info;
-} dar_shared_create_info;
+} cmg_abr_shared_create_info;
 
-typedef struct dar_shared dar_shared;
-dar_shared* dar_create_shared(dgx_hardware*, const dar_shared_create_info*);
-void dar_free_shared(dar_shared*);
+typedef struct cmg_abr_shared cmg_abr_shared;
+cmg_abr_shared* cmg_abr_create_shared(dgx_hardware*, const cmg_abr_shared_create_info*);
+void cmg_abr_free_shared(cmg_abr_shared*);
 
 // ===========================
 // Frames
 
-typedef struct dar_frames_create_info {
-    dar_shared* shared;
+typedef struct cmg_abr_frames_create_info {
+    cmg_abr_shared* shared;
     uint32_t    count;
-} dar_frames_create_info;
+} cmg_abr_frames_create_info;
 
-typedef struct dar_frames dar_frames;
-dar_frames* dar_create_frames(dgx_hardware*, const dar_frames_create_info*);
-void dar_free_frames(dar_frames*);
+typedef struct cmg_abr_frames cmg_abr_frames;
+cmg_abr_frames* cmg_abr_create_frames(dgx_hardware*, const cmg_abr_frames_create_info*);
+void cmg_abr_free_frames(cmg_abr_frames*);
 
 // ===========================
 // Rendering Functions
 
 // Returns non-zero at success
-int dar_upload_cache(
+int cmg_abr_upload_cache(
     arb_upload_access   access,
-    dar_shared*         shared,
-    dar_frames*         frames,
+    cmg_abr_shared*         shared,
+    cmg_abr_frames*         frames,
     uint32_t            frame_idx,
     uint8_t             transfer_work_group_index,
     uint8_t             command_list_allocator_index,
@@ -58,22 +64,126 @@ int dar_upload_cache(
     uint64_t            signal_value
 );
 
-void dar_gcmd_render(
-    dar_frames*         frames,
+void cmg_abr_gcmd_render(
+    cmg_abr_frames*         frames,
     uint32_t            frame
 );
 
-#endif // DEMIURG_ARBOR_RENDERING_H
+#endif // COMPAGES_ARBOR_RENDERING_H
 
-#ifdef DEMIURG_ARBOR_RENDERING_IMPL
+#ifdef COMPAGES_ARBOR_RENDERING_IMPL
 
 // ===========================
 // Implementation Depedency
 
+#include "compages/resources/font.h"
 #include "demiurg/algorithm/partitioner.h"
 #include "demiurg/algorithm/segmenter.h"
 #include <stdlib.h>
 #include <string.h>
+
+// ===========================
+// Glyph Typedef
+
+typedef struct gpu_glyph {
+    dgx_uv_2d   atlas_position;
+    float       off_x,  off_y;
+    float       size_x, size_y;
+} gpu_glyph;
+
+// ===========================
+// Text Layout
+
+void cmg_abr_text_layout_func(
+    const arb_text_data*    text_data,          // Text data to layout
+    int                     width_constrain,    // Given width, 0 == unlimited width
+    size_t*                 out_count,          // Out count of glyphs
+    void**                  out_glyphs,         // Glyphs malloc'ated array, shall be NULL if count == 0
+    int*                    out_width,          // Out pixel width of text box
+    int*                    out_height          // Out pixel height of text box
+) {
+    cmg_fnt_font* font; if (!cmg_abr_injection_query_font(text_data->font, &font)) return;
+    const char* text = text_data->text;
+
+    // If text empty or font invalid
+    // Sent empty text request
+    if (!text || !font) {
+        *out_count  = 0; *out_glyphs = NULL;
+        *out_width  = 0; *out_height = 0;
+        return;
+    }
+
+    // Count glyphs to allocate
+    size_t glyph_count = 0; size_t extra_lines_count = 0;
+    for (size_t i = 0; text[i] != '\0';) {
+        uint32_t cp; i += cmg_fnt_utf8_decode(text, i, &cp);
+        if (cp != '\n') glyph_count++; 
+        else extra_lines_count++;
+    }
+
+    // Allocate glyphs buffer, possibly empty
+    // (text box may be filled with spaces, still we measure)
+    gpu_glyph* glyphs = glyph_count ? malloc(sizeof(gpu_glyph) * glyph_count) : NULL;
+
+    // Find font scale
+    const float font_scale = text_data->size / cmg_fnt_get_base_size(font);
+
+    // Populate glyphs buffer
+    const float ascent      = cmg_fnt_get_base_ascent(font)   * font_scale;
+    const float descent     = cmg_fnt_get_base_descent(font)  * font_scale;
+    const float line_gap    = cmg_fnt_get_base_line_gap(font) * font_scale;
+    const float line_height = ascent - descent + line_gap;
+
+    float    pen_x      = 0.0f;
+    float    pen_y      = 0.0f;
+    float    text_width = 0.0f; // max line width across all lines
+    size_t   glyph_idx  = 0;
+    uint32_t prev_cp    = 0;    // for kerning; 0 = no previous glyph
+
+    for (size_t itr = 0; text[itr] != '\0';) {
+        uint32_t cp; itr += cmg_fnt_utf8_decode(text, itr, &cp);
+
+        // Handle newline
+        if (cp == '\n') {
+            if (pen_x > text_width) text_width = pen_x;
+            pen_x   = 0.0f;
+            pen_y  -= line_height;
+            prev_cp = 0; // reset kerning across lines
+            continue;
+        }
+
+        // Kerning between consecutive glyphs on the same line
+        if (prev_cp) pen_x += cmg_fnt_get_kerning(font, prev_cp, cp);
+
+        // Write glyph
+        const cmg_fnt_glyph g = cmg_fnt_get_glyph(font, cp);
+        glyphs[glyph_idx++] = (gpu_glyph){
+            .atlas_position = g.atlas_position,
+            .off_x          = pen_x + g.bearing_x * font_scale,
+            .off_y          = (extra_lines_count * line_height + pen_y) - g.bearing_y * font_scale,
+            .size_x         = g.size_x * font_scale,
+            .size_y         = g.size_y * font_scale,
+        };
+
+        // Advance
+        pen_x  += g.advance_x * font_scale;
+        prev_cp = cp;
+    }
+
+    // Account for final line (no trailing newline)
+    if (pen_x > text_width) text_width = pen_x;
+
+    // Total pixel height: baseline of last line + full single-line cap height
+    float text_height = -pen_y + ascent;
+
+    // Store text dimensions
+    *out_width  = text_width;
+    *out_height = text_height;
+
+    // Result glyphs
+    *out_count  = glyph_count;
+    *out_glyphs = glyphs;
+}
 
 // ===========================
 // Rendering Common
@@ -91,7 +201,7 @@ typedef struct gpu_instance {
 
 typedef struct gpu_draw_item {
     arb_mat3x2  transform;
-    arb_uv_2d   atlas_position;
+    dgx_uv_2d   atlas_position;
     int         texture_index;
     int         clipbox_index;
     uint32_t    shader_index;
@@ -102,12 +212,6 @@ typedef struct gpu_draw_item {
 typedef struct gpu_clipbox {
     arb_mat3x2  transform;
 } gpu_clipbox;
-
-typedef struct gpu_glyph {
-    arb_uv_2d   atlas_position;
-    float       off_x,  off_y;
-    float       size_x, size_y;
-} gpu_glyph;
 
 typedef struct gpu_vertex_constants {
     uint32_t    resolution_width;
@@ -146,7 +250,7 @@ static inline dgx_buffer* create_glyph_ssbo(dgx_hardware* hardware, uint64_t byt
 // ===========================
 // Shared Object
 
-struct dar_shared {
+struct cmg_abr_shared {
     dgx_hardware*       owning_hardware;
     dgx_sampler*        sampler;
     dgx_pipeline*       pipeline;
@@ -154,8 +258,8 @@ struct dar_shared {
     dgx_buffer*         glyph_buffer;
 };
 
-dar_shared* dar_create_shared(dgx_hardware* hardware, const dar_shared_create_info* info) {
-    dar_shared* shared = calloc(1, sizeof(dar_shared)); if (!shared) return NULL;
+cmg_abr_shared* cmg_abr_create_shared(dgx_hardware* hardware, const cmg_abr_shared_create_info* info) {
+    cmg_abr_shared* shared = calloc(1, sizeof(cmg_abr_shared)); if (!shared) return NULL;
     shared->owning_hardware = hardware;
 
     // Sampler
@@ -226,11 +330,11 @@ dar_shared* dar_create_shared(dgx_hardware* hardware, const dar_shared_create_in
     return shared;
 
 _fail:
-    dar_free_shared(shared);
+    cmg_abr_free_shared(shared);
     return NULL;
 }
 
-void dar_free_shared(dar_shared* shared) {
+void cmg_abr_free_shared(cmg_abr_shared* shared) {
     if (!shared) return;
     dgx_free_sampler(shared->sampler);
     dgx_free_pipeline(shared->pipeline);
@@ -252,16 +356,16 @@ typedef struct single_frame {
     dgx_command_list*       upload_list;
 } single_frame;
 
-struct dar_frames {
-    dar_shared*     owning_shared;
+struct cmg_abr_frames {
+    cmg_abr_shared*     owning_shared;
     uint32_t        count;
     single_frame*   frames;
 };
 
-dar_frames* dar_create_frames(dgx_hardware* hardware, const dar_frames_create_info* info) {
-    dar_shared* shared = info->shared;
+cmg_abr_frames* cmg_abr_create_frames(dgx_hardware* hardware, const cmg_abr_frames_create_info* info) {
+    cmg_abr_shared* shared = info->shared;
 
-    dar_frames* frames = calloc(1, sizeof(dar_frames));  if (!frames) return NULL;
+    cmg_abr_frames* frames = calloc(1, sizeof(cmg_abr_frames));  if (!frames) return NULL;
     frames->owning_shared = shared;
     
     // create frames
@@ -284,11 +388,11 @@ dar_frames* dar_create_frames(dgx_hardware* hardware, const dar_frames_create_in
     return frames;
 
 _fail:
-    dar_free_frames(frames);
+    cmg_abr_free_frames(frames);
     return NULL;
 }
 
-void dar_free_frames(dar_frames* frames) {
+void cmg_abr_free_frames(cmg_abr_frames* frames) {
     if (!frames) return;
     for (uint32_t i = 0; i < frames->count; i++) {
         single_frame* frame = &frames->frames[i];
@@ -337,10 +441,10 @@ static void glyphs_rewrite_record(void* raw_params) {
     );
 }
 
-int dar_upload_cache(
+int cmg_abr_upload_cache(
     arb_upload_access   access,
-    dar_shared*         shared,
-    dar_frames*         frames,
+    cmg_abr_shared*         shared,
+    cmg_abr_frames*         frames,
     uint32_t            frame_idx,
     uint8_t             transfer_work_group_index,
     uint8_t             command_list_allocator_index,
@@ -462,8 +566,8 @@ int dar_upload_cache(
         arb_draw_request req = access.draws_requests[i];
 
         if (req.is_box_not_text) {
-            int texture_index = 0; dgx_texture* texture; arb_uv_2d uv;
-            if (req.box.data.image && dui_injection_query_image_texture(req.box.data.image, &texture, &uv)) {
+            int texture_index = 0; dgx_texture* texture; dgx_uv_2d uv;
+            if (req.box.data.image && cmg_abr_injection_query_image(req.box.data.image, &texture, &uv)) {
                 texture_index = dgx_shader_resource_bind(
                     hardware, dgx_resource_type_sampled_texture, texture, &success
                 );
@@ -490,9 +594,9 @@ int dar_upload_cache(
             arb_text_data text_data =  req.text.data;
             if (!part) continue;
 
-            dgx_texture* font_tex; if (!dui_injection_query_font_texture(text_data.font, &font_tex)) continue;
+            cmg_fnt_font* font_tex; if (!cmg_abr_injection_query_font(text_data.font, &font_tex)) continue;
             uint32_t texture_index = dgx_shader_resource_bind(
-                hardware, dgx_resource_type_sampled_texture, font_tex, &success
+                hardware, dgx_resource_type_sampled_texture, cmg_fnt_get_texture(font_tex), &success
             );
 
             int signed_texture_index = -(int)texture_index; // is font
@@ -500,7 +604,7 @@ int dar_upload_cache(
 
             items[i] = (gpu_draw_item){
                 .transform      = req.transform,
-                .atlas_position = (arb_uv_2d){0, 0, 1, 1},
+                .atlas_position = (dgx_uv_2d){0, 0, 1, 1},
                 .texture_index  = signed_texture_index,
                 .clipbox_index  = req.clip_index,
                 .shader_index   = text_data.shader,
@@ -675,8 +779,8 @@ _cleanup:
     return success;
 }
 
-void dar_gcmd_render(
-    dar_frames* frames,
+void cmg_abr_gcmd_render(
+    cmg_abr_frames* frames,
     uint32_t    frame_idx
 ) {
     single_frame* frame = &frames->frames[frame_idx % frames->count];
@@ -695,4 +799,4 @@ void dar_gcmd_render(
     }
 }
 
-#endif // DEMIURG_ARBOR_RENDERING_IMPL
+#endif // COMPAGES_ARBOR_RENDERING_IMPL

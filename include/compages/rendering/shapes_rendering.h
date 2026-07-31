@@ -1,75 +1,74 @@
 /*
 ----------------------------------------------------------------
 Contents
-
 This file provides simple system to render basic shapes: lines, triangles, rectangles, circles.
 
 ----------------------------------------------------------------
 Code info:
-- dshp prefix
-- DEMIURG_SHAPES_IMPL macro to build
-- graphics.h dependant
-- linear_algebra.h dependant
+- cmg_shp prefix
+- COMPAGES_SHAPES_IMPL macro to build
+- demiurg/graphics.h dependant
+- demiurg/linear_algebra.h dependant
 
 ----------------------------------------------------------------
 Usage
 
-- Create dshp_shared object - it contains shared read-only objects for rendering.
+- Create cmg_shp_shared object - it contains shared read-only objects for rendering.
     Create one per hardware. In create info, link shaders (provided in shader directory).
-- Create dshp_frames - it contains per frame geometry buffers you record with drawing methods.
+- Create cmg_shp_frames - it contains per frame geometry buffers you record with drawing methods.
 - Use commands to draw shapes
-- Upload data to gpu with dshp_upload
-- Render with graphics command dshp_gcmd_render
+- Upload data to gpu with cmg_shp_upload
+- Render with graphics command cmg_shp_gcmd_render
 */
 
-#ifndef DEMIURG_SHAPES_H
-#define DEMIURG_SHAPES_H
+#ifndef COMPAGES_SHAPES_H
+#define COMPAGES_SHAPES_H
 
 #include "demiurg/platform/graphics.h"
 #include "demiurg/mathematics/linear_algebra.h"
 
 // Shapes Rendering Shared Object
 
-typedef struct dshp_shared_create_info {
+typedef struct cmg_shp_shared_create_info {
     dgx_pipeline_attachment_state   attachment_state;
     dgx_shader_create_info          vertex_shader_info;
     dgx_shader_create_info          pixel_shader_info;
-} dshp_shared_create_info;
+} cmg_shp_shared_create_info;
 
-typedef struct dshp_shared dshp_shared;
-dshp_shared* dshp_create_shared(dgx_hardware*, const dshp_shared_create_info* info);
-void dshp_free_shared(dshp_shared*);
+typedef struct cmg_shp_shared cmg_shp_shared;
+cmg_shp_shared* cmg_shp_create_shared(dgx_hardware*, const cmg_shp_shared_create_info* info);
+void cmg_shp_free_shared(cmg_shp_shared*);
 
 // Shapes Rendering Frame Contextes
 
-typedef struct dshp_frames_create_info {
-    dshp_shared*    shared;
+typedef struct cmg_shp_frames_create_info {
+    cmg_shp_shared* shared;
     uint32_t        count;
-} dshp_frames_create_info;
+} cmg_shp_frames_create_info;
 
-typedef struct dshp_frames dshp_frames;
-dshp_frames* dshp_create_frames(dgx_hardware*, const dshp_frames_create_info* info);
-void dshp_free_frames(dshp_frames*);
+typedef struct cmg_shp_frames cmg_shp_frames;
+cmg_shp_frames* cmg_shp_create_frames(dgx_hardware*, const cmg_shp_frames_create_info* info);
+void cmg_shp_free_frames(cmg_shp_frames*);
 
 // shorthand not to pass frame in flight to every function
-typedef struct dshp_context {
-    dshp_frames*    frames;
+typedef struct cmg_shp_context {
+    cmg_shp_frames*    frames;
     uint32_t        index;
     float           r, g, b, a;
     float           line_thickness;
-} dshp_context;
+} cmg_shp_context;
 
 // Actuall Draw Operation
 
 // resets draw requests in context
-void dshp_reset(
-    dshp_context* context
+void cmg_shp_reset(
+    cmg_shp_context* context
 );
 
 // Uploads draw requests to gpu
 // Returns non-zero at success
-int dshp_upload(
-    dshp_context*       context,
+int cmg_shp_upload(
+    cmg_shp_context*       context,
     uint8_t             transfer_work_group_index,
     uint8_t             command_list_allocator_index,
     dgx_staging_memory* staging_memory,
@@ -83,44 +82,44 @@ int dshp_upload(
 // needs to be re recorded every frame as amount of
 // drawn primitives may change
 // call with render target bound, viewport and scissors set
-void dshp_gcmd_render(dshp_context* context);
+void cmg_shp_gcmd_render(cmg_shp_context* context);
 
 // Shapes Draw Function
 
 // set drawn shapes color
-void dshp_set_color(
-    dshp_context* context,
+void cmg_shp_set_color(
+    cmg_shp_context* context,
     float r, float g, float b, float a
 );
 
-void dshp_set_line_thickness(
-    dshp_context* context,
+void cmg_shp_set_line_thickness(
+    cmg_shp_context* context,
     float line_thickness
 );
 
-void dshp_line(
-    dshp_context* context,
+void cmg_shp_line(
+    cmg_shp_context* context,
     dla_vec2 begin, dla_vec2 end
 );
 
-void dshp_triangle(
-    dshp_context* context,
+void cmg_shp_triangle(
+    cmg_shp_context* context,
     dla_vec2 a, dla_vec2 b, dla_vec2 c
 );
 
-void dshp_rect(
-    dshp_context* context,
+void cmg_shp_rect(
+    cmg_shp_context* context,
     dla_vec2 first_corner, dla_vec2 second_corner
 );
 
-void dshp_circle(
-    dshp_context* context,
+void cmg_shp_circle(
+    cmg_shp_context* context,
     dla_vec2 center, float radius
 );
 
-#endif // DEMIURG_SHAPES_H
+#endif // COMPAGES_SHAPES_H
 
-#ifdef DEMIURG_SHAPES_IMPL
+#ifdef COMPAGES_SHAPES_IMPL
 
 #include <stdlib.h>
 #include <string.h>
@@ -148,13 +147,13 @@ typedef struct gpu_constants {
     Shared
 */
 
-struct dshp_shared {
+struct cmg_shp_shared {
     dgx_hardware*   owning_hardware;
     dgx_pipeline*   pipeline;
 };
 
-dshp_shared* dshp_create_shared(dgx_hardware* hardware, const dshp_shared_create_info* info) {
-    dshp_shared* shared = calloc(1, sizeof(dshp_shared)); if (!shared) return NULL;
+cmg_shp_shared* cmg_shp_create_shared(dgx_hardware* hardware, const cmg_shp_shared_create_info* info) {
+    cmg_shp_shared* shared = calloc(1, sizeof(cmg_shp_shared)); if (!shared) return NULL;
     shared->owning_hardware = hardware;
 
     // Pipeline Shaders
@@ -204,11 +203,11 @@ dshp_shared* dshp_create_shared(dgx_hardware* hardware, const dshp_shared_create
     return shared;
 
 _fail:
-    dshp_free_shared(shared); 
+    cmg_shp_free_shared(shared); 
     return NULL;
 }
 
-void dshp_free_shared(dshp_shared* shared) {
+void cmg_shp_free_shared(cmg_shp_shared* shared) {
     if (!shared) return;
     dgx_free_pipeline(shared->pipeline);
     free(shared);
@@ -228,20 +227,20 @@ typedef struct single_frame {
     dgx_command_list*   upload_list;    // List used to upload instances
 } single_frame;
 
-struct dshp_frames {
+struct cmg_shp_frames {
     dgx_hardware*   owning_hardware;
-    dshp_shared*    owning_shared;
+    cmg_shp_shared*    owning_shared;
     uint32_t        in_flight;
     single_frame*   frames;
 };
 
-dshp_frames* dshp_create_frames(dgx_hardware* hardware, const dshp_frames_create_info* info) {
+cmg_shp_frames* cmg_shp_create_frames(dgx_hardware* hardware, const cmg_shp_frames_create_info* info) {
     if (!hardware || !info->shared) goto _fail;
 
-    dshp_frames* frames = calloc(1, sizeof(dshp_frames)); 
+    cmg_shp_frames* frames = calloc(1, sizeof(cmg_shp_frames)); 
     if (!frames) goto _fail;
 
-    *frames = (dshp_frames) {
+    *frames = (cmg_shp_frames) {
         .owning_hardware = hardware,
         .owning_shared   = info->shared,
         .in_flight       = info->count
@@ -254,11 +253,11 @@ dshp_frames* dshp_create_frames(dgx_hardware* hardware, const dshp_frames_create
     return frames;
 
 _fail:
-    dshp_free_frames(frames);
+    cmg_shp_free_frames(frames);
     return NULL;
 }
 
-void dshp_free_frames(dshp_frames* frames) {
+void cmg_shp_free_frames(cmg_shp_frames* frames) {
     if (!frames) return;
     for (uint32_t i = 0; i < frames->in_flight; i++) {
         dgx_free_buffer(frames->frames[i].buffer);
@@ -269,7 +268,7 @@ void dshp_free_frames(dshp_frames* frames) {
     free(frames);
 }
 
-void dshp_reset(dshp_context* context) {
+void cmg_shp_reset(cmg_shp_context* context) {
     single_frame* frame = &context->frames->frames[context->index];
     frame->position = 0;
 }
@@ -293,8 +292,8 @@ static uint64_t min_u64(uint64_t l, uint64_t r) {
     return l < r ? l : r;
 }
 
-int dshp_upload(
-    dshp_context*       context,
+int cmg_shp_upload(
+    cmg_shp_context*       context,
     uint8_t             transfer_work_group_index,
     uint8_t             command_list_allocator_index,
     dgx_staging_memory* staging_memory,
@@ -397,7 +396,7 @@ int dshp_upload(
     return bind_success;
 }
 
-void dshp_gcmd_render(dshp_context* context) {
+void cmg_shp_gcmd_render(cmg_shp_context* context) {
     single_frame* frame = &context->frames->frames[context->index];
     if (frame->to_draw) {
         dgx_gcmd_bind_graphics_pipeline(context->frames->owning_shared->pipeline);
@@ -417,7 +416,7 @@ void dshp_gcmd_render(dshp_context* context) {
 */
 
 static inline void emit_triangle(
-    dshp_context* context, 
+    cmg_shp_context* context, 
     float x0,   float y0,
     float x1,   float y1,
     float x2,   float y2,
@@ -450,15 +449,15 @@ static inline void emit_triangle(
     };
 };
 
-void dshp_set_color(dshp_context* context, float r, float g, float b, float a) {
+void cmg_shp_set_color(cmg_shp_context* context, float r, float g, float b, float a) {
     context->r = r; context->g = g; context->b = b; context->a = a;
 }
 
-void dshp_set_line_thickness(dshp_context* context, float line_thickness) {
+void cmg_shp_set_line_thickness(cmg_shp_context* context, float line_thickness) {
     context->line_thickness = line_thickness;
 }
 
-void dshp_line(dshp_context* context, dla_vec2 begin, dla_vec2 end) {
+void cmg_shp_line(cmg_shp_context* context, dla_vec2 begin, dla_vec2 end) {
     single_frame* frame = &context->frames->frames[context->index];
 
     float dx = end.x - begin.x;
@@ -488,11 +487,11 @@ void dshp_line(dshp_context* context, dla_vec2 begin, dla_vec2 end) {
     );
 }
 
-void dshp_triangle(dshp_context* context, dla_vec2 a, dla_vec2 b, dla_vec2 c) {
+void cmg_shp_triangle(cmg_shp_context* context, dla_vec2 a, dla_vec2 b, dla_vec2 c) {
     emit_triangle(context, a.x, a.y, b.x, b.y, c.x, c.y, 0, 0, -1.0f); // unrounded
 }
 
-void dshp_rect(dshp_context* context, dla_vec2 first_corner, dla_vec2 second_corner) {
+void cmg_shp_rect(cmg_shp_context* context, dla_vec2 first_corner, dla_vec2 second_corner) {
     emit_triangle(
         context,
         first_corner.x,  first_corner.y,
@@ -510,7 +509,7 @@ void dshp_rect(dshp_context* context, dla_vec2 first_corner, dla_vec2 second_cor
     );
 }
 
-void dshp_circle(dshp_context* context, dla_vec2 center, float radius) {
+void cmg_shp_circle(cmg_shp_context* context, dla_vec2 center, float radius) {
     emit_triangle(context, 
         center.x - radius, center.y - radius, 
         center.x - radius, center.y + radius, 
@@ -526,4 +525,4 @@ void dshp_circle(dshp_context* context, dla_vec2 center, float radius) {
     );
 }
 
-#endif // DEMIURG_SHAPES_IMPL
+#endif // COMPAGES_SHAPES_IMPL

@@ -1,4 +1,4 @@
-# Compages Font File
+# Seshat Compages Font
 Is a Seshat Version 0 File for fonts storage.
 
 ## Archive Contents
