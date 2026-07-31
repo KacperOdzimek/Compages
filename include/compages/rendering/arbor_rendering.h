@@ -51,22 +51,22 @@ void cmg_abr_free_frames(cmg_abr_frames*);
 
 // Returns non-zero at success
 int cmg_abr_upload_cache(
-    arb_upload_access   access,
+    arb_upload_access       access,
     cmg_abr_shared*         shared,
     cmg_abr_frames*         frames,
-    uint32_t            frame_idx,
-    uint8_t             transfer_work_group_index,
-    uint8_t             command_list_allocator_index,
+    uint32_t                frame_idx,
+    uint8_t                 transfer_work_group_index,
+    uint8_t                 command_list_allocator_index,
     dmg_gfx_staging_memory* staging_memory,
-    uint64_t            staging_memory_region_offset,
-    uint64_t            staging_memory_region_size,
+    uint64_t                staging_memory_region_offset,
+    uint64_t                staging_memory_region_size,
     dmg_gfx_timeline*       signal_timeline,
-    uint64_t            signal_value
+    uint64_t                signal_value
 );
 
 void cmg_abr_gcmd_render(
     cmg_abr_frames*         frames,
-    uint32_t            frame
+    uint32_t                frame
 );
 
 #endif // COMPAGES_ARBOR_RENDERING_H

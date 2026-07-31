@@ -188,6 +188,8 @@ cmg_fnt_font* cmg_fnt_create_font(dmg_gfx_hardware* hardware, const cmg_fnt_crea
     if (sht_view_find(view, "texture_height", &idx) != sht_status_ok ||
         sht_view_get_as_int64(view, idx, &tex_h) != sht_status_ok) goto _fail;
 
+    if (tex_w > UINT32_MAX || tex_h > UINT32_MAX) goto _fail;
+
     // Decompress Texture Data
     if (sht_view_find(view, "texture", &idx) == sht_status_ok) {
         uint64_t uncompressed_size = 0;
@@ -246,7 +248,7 @@ cmg_fnt_font* cmg_fnt_create_font(dmg_gfx_hardware* hardware, const cmg_fnt_crea
         free(raw_glyphs);
     }
 
-    // 4. Decompress and Parse Kerning Pairs
+    // Decompress and Parse Kerning Pairs
     if (sht_view_find(view, "kerning", &idx) != sht_status_ok) goto _fail;
     uint64_t uncompressed_size = 0;
     if (sht_view_get_as_uncompressed_size(view, idx, &uncompressed_size) == sht_status_ok && uncompressed_size > 0) {
@@ -277,6 +279,21 @@ cmg_fnt_font* cmg_fnt_create_font(dmg_gfx_hardware* hardware, const cmg_fnt_crea
 
         free(raw_kerning);
     }
+
+    // Create texture
+    font->atlas_texture = dmg_gfx_create_texture(hardware, &(dmg_gfx_texture_create_info){
+        .type   = dmg_gfx_texture_type_2d,
+        .usage  = dmg_gfx_texture_usage_sampled,
+        .dimensions = (dmg_gfx_texture_dimensions){
+            .width  = tex_w,
+            .height = tex_h,
+            .depth  = 1
+        },
+        .mipmap_layers  = 1,
+        .array_length   = 1,
+        .format         = dmg_gfx_texture_format_r8_unorm,
+        .memory_access  = dmg_gfx_memory_access_staging_write
+    }); if (!font->atlas_texture) goto _fail;
 
     return font;
 _fail:

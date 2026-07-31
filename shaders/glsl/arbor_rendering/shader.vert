@@ -115,17 +115,17 @@ void main() {
         mat3 local_transform = mat3(1.0);
 
         local_transform *= mat3(
-            glyph.size_x * pixel_to_norm_x / 2, 0.0, 0.0,
-            0.0, glyph.size_y * pixel_to_norm_y / 2, 0.0,
-            0.0, 0.0, 1.0
-        );
-
-        local_transform *= mat3(
             1.0, 0.0, 0.0,
             0.0, 1.0, 0.0,
             -1.0 + (2.0 * glyph.off_x + glyph.size_x) / text_box_size.x,
             -1.0 + (2.0 * glyph.off_y - glyph.size_y) / text_box_size.y,
             1.0
+        );
+
+        local_transform *= mat3(
+            glyph.size_x * pixel_to_norm_x / 2, 0.0, 0.0,
+            0.0, glyph.size_y * pixel_to_norm_y / 2, 0.0,
+            0.0, 0.0, 1.0
         );
 
         transform = transform * local_transform;
