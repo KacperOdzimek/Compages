@@ -13,7 +13,7 @@
 // Implementation Injections - User define those functions
 // Functions shall return non-zero at successful find
 
-int cmg_abr_injection_query_image(const char* image, dgx_texture** texture_out, dgx_uv_2d* uv_out);
+int cmg_abr_injection_query_image(const char* image, dmg_gfx_texture** texture_out, dmg_gfx_uv_2d* uv_out);
 int cmg_abr_injection_query_font(const char* font, cmg_fnt_font** font_out);
 
 // ===========================
@@ -25,13 +25,13 @@ arb_text_layout_func_signature cmg_abr_text_layout_func;
 // Shared
 
 typedef struct cmg_abr_shared_create_info {
-    dgx_pipeline_attachment_state   attachment_state;
-    dgx_shader_create_info          vertex_shader_info;
-    dgx_shader_create_info          pixel_shader_info;
+    dmg_gfx_pipeline_attachment_state   attachment_state;
+    dmg_gfx_shader_create_info          vertex_shader_info;
+    dmg_gfx_shader_create_info          pixel_shader_info;
 } cmg_abr_shared_create_info;
 
 typedef struct cmg_abr_shared cmg_abr_shared;
-cmg_abr_shared* cmg_abr_create_shared(dgx_hardware*, const cmg_abr_shared_create_info*);
+cmg_abr_shared* cmg_abr_create_shared(dmg_gfx_hardware*, const cmg_abr_shared_create_info*);
 void cmg_abr_free_shared(cmg_abr_shared*);
 
 // ===========================
@@ -43,7 +43,7 @@ typedef struct cmg_abr_frames_create_info {
 } cmg_abr_frames_create_info;
 
 typedef struct cmg_abr_frames cmg_abr_frames;
-cmg_abr_frames* cmg_abr_create_frames(dgx_hardware*, const cmg_abr_frames_create_info*);
+cmg_abr_frames* cmg_abr_create_frames(dmg_gfx_hardware*, const cmg_abr_frames_create_info*);
 void cmg_abr_free_frames(cmg_abr_frames*);
 
 // ===========================
@@ -57,10 +57,10 @@ int cmg_abr_upload_cache(
     uint32_t            frame_idx,
     uint8_t             transfer_work_group_index,
     uint8_t             command_list_allocator_index,
-    dgx_staging_memory* staging_memory,
+    dmg_gfx_staging_memory* staging_memory,
     uint64_t            staging_memory_region_offset,
     uint64_t            staging_memory_region_size,
-    dgx_timeline*       signal_timeline,
+    dmg_gfx_timeline*       signal_timeline,
     uint64_t            signal_value
 );
 
@@ -86,7 +86,7 @@ void cmg_abr_gcmd_render(
 // Glyph Typedef
 
 typedef struct gpu_glyph {
-    dgx_uv_2d   atlas_position;
+    dmg_gfx_uv_2d   atlas_position;
     float       off_x,  off_y;
     float       size_x, size_y;
 } gpu_glyph;
@@ -201,7 +201,7 @@ typedef struct gpu_instance {
 
 typedef struct gpu_draw_item {
     arb_mat3x2  transform;
-    dgx_uv_2d   atlas_position;
+    dmg_gfx_uv_2d   atlas_position;
     int         texture_index;
     int         clipbox_index;
     uint32_t    shader_index;
@@ -231,19 +231,19 @@ typedef struct gpu_pixel_constants {
 // ===========================
 // Helper Methods
 
-static inline dgx_buffer* create_ssbo(dgx_hardware* hardware, uint64_t bytes) {
-    return dgx_create_buffer(hardware, &(dgx_buffer_create_info){
+static inline dmg_gfx_buffer* create_ssbo(dmg_gfx_hardware* hardware, uint64_t bytes) {
+    return dmg_gfx_create_buffer(hardware, &(dmg_gfx_buffer_create_info){
         .bytes  = bytes,
-        .access = dgx_memory_access_staging_write,
-        .usage  = dgx_buffer_usage_storage
+        .access = dmg_gfx_memory_access_staging_write,
+        .usage  = dmg_gfx_buffer_usage_storage
     });
 }
 
-static inline dgx_buffer* create_glyph_ssbo(dgx_hardware* hardware, uint64_t bytes) {
-    return dgx_create_buffer(hardware, &(dgx_buffer_create_info){
+static inline dmg_gfx_buffer* create_glyph_ssbo(dmg_gfx_hardware* hardware, uint64_t bytes) {
+    return dmg_gfx_create_buffer(hardware, &(dmg_gfx_buffer_create_info){
         .bytes  = bytes,
-        .access = dgx_memory_access_staging_read_and_write,
-        .usage  = dgx_buffer_usage_storage
+        .access = dmg_gfx_memory_access_staging_read_and_write,
+        .usage  = dmg_gfx_buffer_usage_storage
     });
 }
 
@@ -251,25 +251,25 @@ static inline dgx_buffer* create_glyph_ssbo(dgx_hardware* hardware, uint64_t byt
 // Shared Object
 
 struct cmg_abr_shared {
-    dgx_hardware*       owning_hardware;
-    dgx_sampler*        sampler;
-    dgx_pipeline*       pipeline;
-    dpr_partitioner*    glyph_buffer_partitioner;
-    dgx_buffer*         glyph_buffer;
+    dmg_gfx_hardware*       owning_hardware;
+    dmg_gfx_sampler*        sampler;
+    dmg_gfx_pipeline*       pipeline;
+    dmg_par_partitioner*    glyph_buffer_partitioner;
+    dmg_gfx_buffer*         glyph_buffer;
 };
 
-cmg_abr_shared* cmg_abr_create_shared(dgx_hardware* hardware, const cmg_abr_shared_create_info* info) {
+cmg_abr_shared* cmg_abr_create_shared(dmg_gfx_hardware* hardware, const cmg_abr_shared_create_info* info) {
     cmg_abr_shared* shared = calloc(1, sizeof(cmg_abr_shared)); if (!shared) return NULL;
     shared->owning_hardware = hardware;
 
     // Sampler
-    shared->sampler = dgx_create_sampler(hardware, &(dgx_sampler_create_info){
-        .mag_filter                 = dgx_sampler_filter_linear,
-        .min_filter                 = dgx_sampler_filter_linear,
-        .mipmap_filter              = dgx_sampler_filter_linear,
-        .x_coord_wrapping           = dgx_sampler_wrapping_repeat,
-        .y_coord_wrapping           = dgx_sampler_wrapping_repeat,
-        .z_coord_wrapping           = dgx_sampler_wrapping_repeat,
+    shared->sampler = dmg_gfx_create_sampler(hardware, &(dmg_gfx_sampler_create_info){
+        .mag_filter                 = dmg_gfx_sampler_filter_linear,
+        .min_filter                 = dmg_gfx_sampler_filter_linear,
+        .mipmap_filter              = dmg_gfx_sampler_filter_linear,
+        .x_coord_wrapping           = dmg_gfx_sampler_wrapping_repeat,
+        .y_coord_wrapping           = dmg_gfx_sampler_wrapping_repeat,
+        .z_coord_wrapping           = dmg_gfx_sampler_wrapping_repeat,
         .unnormalized_coordinates   = 0,
         .min_lod                    = 0,
         .max_lod                    = 1,
@@ -281,50 +281,50 @@ cmg_abr_shared* cmg_abr_create_shared(dgx_hardware* hardware, const cmg_abr_shar
     if (!shared->glyph_buffer) goto _fail;
 
     // Glyph buffer partitioner
-    shared->glyph_buffer_partitioner = dpr_create_partitioner(&(dpr_partitioner_create_info){
+    shared->glyph_buffer_partitioner = dmg_par_create_partitioner(&(dmg_par_partitioner_create_info){
         .memory_bytes = INITIAL_GLYPH_BUFFER_SIZE
     }); if (!shared->glyph_buffer_partitioner) goto _fail;
 
     // Pipeline Shaders
-    dgx_shader* vertex_shader = dgx_create_shader(shared->owning_hardware, &info->vertex_shader_info);
-    dgx_shader* pixel_shader  = dgx_create_shader(shared->owning_hardware, &info->pixel_shader_info);
+    dmg_gfx_shader* vertex_shader = dmg_gfx_create_shader(shared->owning_hardware, &info->vertex_shader_info);
+    dmg_gfx_shader* pixel_shader  = dmg_gfx_create_shader(shared->owning_hardware, &info->pixel_shader_info);
 
     if (!vertex_shader || !pixel_shader) {
-        dgx_free_shader(vertex_shader);
-        dgx_free_shader(pixel_shader);
+        dmg_gfx_free_shader(vertex_shader);
+        dmg_gfx_free_shader(pixel_shader);
         goto _fail;
     }
 
     // Pipeline
-    shared->pipeline = dgx_create_pipeline(shared->owning_hardware, &(dgx_pipeline_create_info){
+    shared->pipeline = dmg_gfx_create_pipeline(shared->owning_hardware, &(dmg_gfx_pipeline_create_info){
         .attachment_state = info->attachment_state,
         .shader_stages = {
-            .shaders[dgx_shader_stage_vertex]   = vertex_shader,
-            .constants[dgx_shader_stage_vertex] = sizeof(gpu_vertex_constants),
-            .shaders[dgx_shader_stage_pixel]    = pixel_shader,
-            .constants[dgx_shader_stage_pixel]  = sizeof(gpu_pixel_constants)
+            .shaders[dmg_gfx_shader_stage_vertex]   = vertex_shader,
+            .constants[dmg_gfx_shader_stage_vertex] = sizeof(gpu_vertex_constants),
+            .shaders[dmg_gfx_shader_stage_pixel]    = pixel_shader,
+            .constants[dmg_gfx_shader_stage_pixel]  = sizeof(gpu_pixel_constants)
         },
         .input_assembler_state = {
-            .topology = dgx_primitive_topology_triangle_strip
+            .topology = dmg_gfx_primitive_topology_triangle_strip
         },
         .rasterizer_state = {
             .scissor_enable     = 0,
             .depth_clamp_enable = 0,
-            .fill_mode          = dgx_fill_mode_solid,
-            .cull_mode          = dgx_cull_mode_none
+            .fill_mode          = dmg_gfx_fill_mode_solid,
+            .cull_mode          = dmg_gfx_cull_mode_none
         },
         .blend_state = {
             .blend_enable   = 1,
-            .blend_op       = dgx_blend_op_add,
-            .src_factor     = dgx_blend_factor_src_alpha,
-            .dst_factor     = dgx_blend_factor_one_minus_src_alpha,
+            .blend_op       = dmg_gfx_blend_op_add,
+            .src_factor     = dmg_gfx_blend_factor_src_alpha,
+            .dst_factor     = dmg_gfx_blend_factor_one_minus_src_alpha,
         },
         .depth_stencil_state = {
             .depth_test_enable      = 0,
             .depth_write_enable     = 0,
             .stencil_test_enable    = 0
         }
-    });  dgx_free_shader(vertex_shader); dgx_free_shader(pixel_shader);
+    });  dmg_gfx_free_shader(vertex_shader); dmg_gfx_free_shader(pixel_shader);
     if (!shared->pipeline) goto _fail;
 
     return shared;
@@ -336,10 +336,10 @@ _fail:
 
 void cmg_abr_free_shared(cmg_abr_shared* shared) {
     if (!shared) return;
-    dgx_free_sampler(shared->sampler);
-    dgx_free_pipeline(shared->pipeline);
-    dgx_free_buffer(shared->glyph_buffer);
-    dpr_free_partitioner(shared->glyph_buffer_partitioner);
+    dmg_gfx_free_sampler(shared->sampler);
+    dmg_gfx_free_pipeline(shared->pipeline);
+    dmg_gfx_free_buffer(shared->glyph_buffer);
+    dmg_par_free_partitioner(shared->glyph_buffer_partitioner);
     free(shared);
 }
 
@@ -348,12 +348,12 @@ void cmg_abr_free_shared(cmg_abr_shared* shared) {
 
 typedef struct single_frame {
     uint32_t                instances_to_render;
-    dgx_buffer*             instances_buffer;
-    dgx_buffer*             draw_items_buffer;
-    dgx_buffer*             clipboxes_buffer;
+    dmg_gfx_buffer*             instances_buffer;
+    dmg_gfx_buffer*             draw_items_buffer;
+    dmg_gfx_buffer*             clipboxes_buffer;
     gpu_vertex_constants    vertex_constants;
     gpu_pixel_constants     pixel_constants;
-    dgx_command_list*       upload_list;
+    dmg_gfx_command_list*       upload_list;
 } single_frame;
 
 struct cmg_abr_frames {
@@ -362,7 +362,7 @@ struct cmg_abr_frames {
     single_frame*   frames;
 };
 
-cmg_abr_frames* cmg_abr_create_frames(dgx_hardware* hardware, const cmg_abr_frames_create_info* info) {
+cmg_abr_frames* cmg_abr_create_frames(dmg_gfx_hardware* hardware, const cmg_abr_frames_create_info* info) {
     cmg_abr_shared* shared = info->shared;
 
     cmg_abr_frames* frames = calloc(1, sizeof(cmg_abr_frames));  if (!frames) return NULL;
@@ -396,10 +396,10 @@ void cmg_abr_free_frames(cmg_abr_frames* frames) {
     if (!frames) return;
     for (uint32_t i = 0; i < frames->count; i++) {
         single_frame* frame = &frames->frames[i];
-        dgx_free_buffer(frame->instances_buffer);
-        dgx_free_buffer(frame->draw_items_buffer);
-        dgx_free_buffer(frame->clipboxes_buffer);
-        dgx_free_command_list(frame->upload_list);
+        dmg_gfx_free_buffer(frame->instances_buffer);
+        dmg_gfx_free_buffer(frame->draw_items_buffer);
+        dmg_gfx_free_buffer(frame->clipboxes_buffer);
+        dmg_gfx_free_command_list(frame->upload_list);
     }
     free(frames->frames);
     free(frames);
@@ -409,19 +409,19 @@ void cmg_abr_free_frames(cmg_abr_frames* frames) {
 // Rendering Functions
 
 typedef struct ui_upload_params {
-    uint64_t            count;
-    dgs_upload_request* requests;
-    dgx_staging_memory* staging;
-    uint64_t            offset;
+    uint64_t                count;
+    dmg_seg_upload_request* requests;
+    dmg_gfx_staging_memory* staging;
+    uint64_t                offset;
 } ui_upload_params;
 
 static void ui_upload_record(void* raw_params) {
     ui_upload_params* params = raw_params;
     uint64_t offset = 0;
     for (uint64_t i = 0; i < params->count; i++) {
-        dgs_upload_request req = params->requests[i];
-        dgx_tcmd_copy_staging_memory_to_buffer(
-            params->staging, (dgx_buffer*)req.target,
+        dmg_seg_upload_request req = params->requests[i];
+        dmg_gfx_tcmd_copy_staging_memory_to_buffer(
+            params->staging, (dmg_gfx_buffer*)req.target,
             params->offset + offset, req.offset, req.bytes
         );
         offset += req.bytes;
@@ -429,15 +429,15 @@ static void ui_upload_record(void* raw_params) {
 }
 
 typedef struct glyphs_rewrite_params {
-    dgx_buffer* old_buffer;
-    dgx_buffer* new_buffer;
+    dmg_gfx_buffer* old_buffer;
+    dmg_gfx_buffer* new_buffer;
 } glyphs_rewrite_params;
 
 static void glyphs_rewrite_record(void* raw_params) {
     glyphs_rewrite_params* params = raw_params;
-    dgx_tcmd_copy_buffer_to_buffer(
+    dmg_gfx_tcmd_copy_buffer_to_buffer(
         params->old_buffer, params->new_buffer, 0, 0, 
-        dgx_buffer_query_bytes(params->old_buffer)
+        dmg_gfx_buffer_query_bytes(params->old_buffer)
     );
 }
 
@@ -448,27 +448,27 @@ int cmg_abr_upload_cache(
     uint32_t            frame_idx,
     uint8_t             transfer_work_group_index,
     uint8_t             command_list_allocator_index,
-    dgx_staging_memory* staging_memory,
+    dmg_gfx_staging_memory* staging_memory,
     uint64_t            staging_memory_region_offset,
     uint64_t            staging_memory_region_size,
-    dgx_timeline*       signal_timeline,
+    dmg_gfx_timeline*       signal_timeline,
     uint64_t            signal_value
 ) {
-    dgx_hardware* hardware = shared->owning_hardware;
+    dmg_gfx_hardware* hardware = shared->owning_hardware;
     single_frame* frame    = &frames->frames[frame_idx];
 
     // Function-wide success flag
     int success = 1;
 
     // Create segmenter
-    dgs_segmenter* segmenter = dgs_create_segmenter(&(dgs_segmenter_create_info){
+    dmg_seg_segmenter* segmenter = dmg_seg_create_segmenter(&(dmg_seg_segmenter_create_info){
         .bandwidth = staging_memory_region_size
     }); if (!segmenter) goto _cleanup;
 
     // Free garbage text
     for (size_t i = 0; i < access.text_free_count; i++) {
-        dpr_partition* part = access.text_free_requests[i].text_pointer;
-        dpr_partitioner_free_partition(shared->glyph_buffer_partitioner, part);
+        dmg_par_partition* part = access.text_free_requests[i].text_pointer;
+        dmg_par_partitioner_free_partition(shared->glyph_buffer_partitioner, part);
     }
 
     // Allocate new text
@@ -480,7 +480,7 @@ int cmg_abr_upload_cache(
         if (!req.glyphs_count) continue;
 
         // Request new partition
-        dpr_partition* text_partition = dpr_partitioner_alloc_partition(
+        dmg_par_partition* text_partition = dmg_par_partitioner_alloc_partition(
             shared->glyph_buffer_partitioner,
             req.glyphs_count * sizeof(gpu_glyph), 
             GLYPH_STRUCTURE_ALIGN
@@ -488,18 +488,18 @@ int cmg_abr_upload_cache(
 
         // Failed to create partition - create bigger text buffer
         if (!text_partition) {
-            dgx_hardware_wait_idle(hardware);
+            dmg_gfx_hardware_wait_idle(hardware);
 
             // Alloc new buffer with double size
-            uint64_t old_bytes = dgx_buffer_query_bytes(shared->glyph_buffer);
-            dgx_buffer* new_buffer = create_glyph_ssbo(hardware, old_bytes * 2);
+            uint64_t old_bytes = dmg_gfx_buffer_query_bytes(shared->glyph_buffer);
+            dmg_gfx_buffer* new_buffer = create_glyph_ssbo(hardware, old_bytes * 2);
 
             // Failed to alloc new buffer
             if (!new_buffer) continue;
 
             // Rewrite contents
-            dgx_command_list* rewrite_list = dgx_create_command_list(hardware, &(dgx_command_list_create_info){
-                .domain = dgx_command_domain_transfer,
+            dmg_gfx_command_list* rewrite_list = dmg_gfx_create_command_list(hardware, &(dmg_gfx_command_list_create_info){
+                .domain = dmg_gfx_command_domain_transfer,
                 .aindex = transfer_work_group_index,
                 .record = glyphs_rewrite_record,
                 .params = &(glyphs_rewrite_params){
@@ -509,15 +509,15 @@ int cmg_abr_upload_cache(
             });
 
             // Submit
-            dgx_command_list_submit(1, &rewrite_list, &(dgx_submit_info){.domain_work_group = 0});
-            dgx_hardware_wait_idle(hardware); dgx_free_command_list(rewrite_list);
+            dmg_gfx_command_list_submit(1, &rewrite_list, &(dmg_gfx_submit_info){.domain_work_group = 0});
+            dmg_gfx_hardware_wait_idle(hardware); dmg_gfx_free_command_list(rewrite_list);
 
             // Since rewrited, pick new buffer
-            dgx_free_buffer(shared->glyph_buffer);
+            dmg_gfx_free_buffer(shared->glyph_buffer);
             shared->glyph_buffer = new_buffer;
 
             // Resize partitioner
-            shared->glyph_buffer_partitioner = dpr_create_partitioner(&(dpr_partitioner_create_info){
+            shared->glyph_buffer_partitioner = dmg_par_create_partitioner(&(dmg_par_partitioner_create_info){
                 .memory_bytes    = old_bytes * 2,
                 .old_partitioner = shared->glyph_buffer_partitioner
             });
@@ -533,12 +533,12 @@ int cmg_abr_upload_cache(
     // Generate draw regions for texts
     for (size_t i = 0; i < access.text_alloc_count; i++) {
         arb_text_alloc_request  req  = access.text_alloc_requests[i];
-        dpr_partition*  prt  = *req.text_pointer_out;
+        dmg_par_partition*  prt  = *req.text_pointer_out;
         if (!prt) continue; // Text empty, nothing to upload
 
-        dgs_segmenter_upload(segmenter, (dgs_upload_request){
+        dmg_seg_segmenter_upload(segmenter, (dmg_seg_upload_request){
             .target = (uint64_t)shared->glyph_buffer,
-            .offset = dpr_partition_query_offset(prt),
+            .offset = dmg_par_partition_query_offset(prt),
             .source = req.glyphs,
             .bytes  = req.glyphs_count * sizeof(gpu_glyph)
         });
@@ -566,10 +566,10 @@ int cmg_abr_upload_cache(
         arb_draw_request req = access.draws_requests[i];
 
         if (req.is_box_not_text) {
-            int texture_index = 0; dgx_texture* texture; dgx_uv_2d uv;
+            int texture_index = 0; dmg_gfx_texture* texture; dmg_gfx_uv_2d uv;
             if (req.box.data.image && cmg_abr_injection_query_image(req.box.data.image, &texture, &uv)) {
-                texture_index = dgx_shader_resource_bind(
-                    hardware, dgx_resource_type_sampled_texture, texture, &success
+                texture_index = dmg_gfx_shader_resource_bind(
+                    hardware, dmg_gfx_resource_type_sampled_texture, texture, &success
                 );
                 texture_index++; // offset so idx 0 is no texture in shader
             }
@@ -590,13 +590,13 @@ int cmg_abr_upload_cache(
             instances_count += 1;  // single box
         }
         else {
-            dpr_partition* part     = *req.text.pointer;
+            dmg_par_partition* part     = *req.text.pointer;
             arb_text_data text_data =  req.text.data;
             if (!part) continue;
 
             cmg_fnt_font* font_tex; if (!cmg_abr_injection_query_font(text_data.font, &font_tex)) continue;
-            uint32_t texture_index = dgx_shader_resource_bind(
-                hardware, dgx_resource_type_sampled_texture, cmg_fnt_get_texture(font_tex), &success
+            uint32_t texture_index = dmg_gfx_shader_resource_bind(
+                hardware, dmg_gfx_resource_type_sampled_texture, cmg_fnt_get_texture(font_tex), &success
             );
 
             int signed_texture_index = -(int)texture_index; // is font
@@ -604,7 +604,7 @@ int cmg_abr_upload_cache(
 
             items[i] = (gpu_draw_item){
                 .transform      = req.transform,
-                .atlas_position = (dgx_uv_2d){0, 0, 1, 1},
+                .atlas_position = (dmg_gfx_uv_2d){0, 0, 1, 1},
                 .texture_index  = signed_texture_index,
                 .clipbox_index  = req.clip_index,
                 .shader_index   = text_data.shader,
@@ -614,7 +614,7 @@ int cmg_abr_upload_cache(
                 .a              = (float)text_data.tint.a / 255.0f,
             };
 
-            instances_count += dpr_partition_query_size(part) / sizeof(gpu_glyph);
+            instances_count += dmg_par_partition_query_size(part) / sizeof(gpu_glyph);
         }
     }
 
@@ -631,11 +631,11 @@ int cmg_abr_upload_cache(
             };
         }
         else {
-            dpr_partition* part = *req.text.pointer;
+            dmg_par_partition* part = *req.text.pointer;
             if (!part) continue;
             
-            size_t first  = dpr_partition_query_offset(part) / sizeof(gpu_glyph);
-            size_t glyphs = dpr_partition_query_size(part) / sizeof(gpu_glyph);
+            size_t first  = dmg_par_partition_query_offset(part) / sizeof(gpu_glyph);
+            size_t glyphs = dmg_par_partition_query_size(part) / sizeof(gpu_glyph);
             for (size_t g = 0; g < glyphs; g++) {
                 instances[instance_idx++] = (gpu_instance){
                     .item   = i,
@@ -657,45 +657,45 @@ int cmg_abr_upload_cache(
     }
 
     // Items buffer
-    if (dgx_buffer_query_bytes(frame->draw_items_buffer) < items_bytes) {
-        dgx_buffer* new_buffer = create_ssbo(hardware, items_bytes);
+    if (dmg_gfx_buffer_query_bytes(frame->draw_items_buffer) < items_bytes) {
+        dmg_gfx_buffer* new_buffer = create_ssbo(hardware, items_bytes);
         if (!new_buffer) {success = 0; goto _cleanup;}
-        dgx_free_buffer(frame->draw_items_buffer);
+        dmg_gfx_free_buffer(frame->draw_items_buffer);
         frame->draw_items_buffer = new_buffer;
     }
 
     // Instanced buffer
-    if (dgx_buffer_query_bytes(frame->instances_buffer) < instances_bytes) {
-        dgx_buffer* new_buffer = create_ssbo(hardware, instances_bytes);
+    if (dmg_gfx_buffer_query_bytes(frame->instances_buffer) < instances_bytes) {
+        dmg_gfx_buffer* new_buffer = create_ssbo(hardware, instances_bytes);
         if (!new_buffer) {success = 0; goto _cleanup;}
-        dgx_free_buffer(frame->instances_buffer);
+        dmg_gfx_free_buffer(frame->instances_buffer);
         frame->instances_buffer = new_buffer;
     }
 
     // Clipboxes buffer
-    if (dgx_buffer_query_bytes(frame->clipboxes_buffer) < clipboxes_bytes) {
-        dgx_buffer* new_buffer = create_ssbo(hardware, clipboxes_bytes);
+    if (dmg_gfx_buffer_query_bytes(frame->clipboxes_buffer) < clipboxes_bytes) {
+        dmg_gfx_buffer* new_buffer = create_ssbo(hardware, clipboxes_bytes);
         if (!new_buffer) {success = 0; goto _cleanup;}
-        dgx_free_buffer(frame->clipboxes_buffer);
+        dmg_gfx_free_buffer(frame->clipboxes_buffer);
         frame->clipboxes_buffer = new_buffer;
     }
 
     // Uploads requests
-    dgs_segmenter_upload(segmenter, (dgs_upload_request){
+    dmg_seg_segmenter_upload(segmenter, (dmg_seg_upload_request){
         .target = (uint64_t)frame->draw_items_buffer,
         .offset = 0,
         .source = items,
         .bytes  = items_count * sizeof(gpu_draw_item)
     });
 
-    dgs_segmenter_upload(segmenter, (dgs_upload_request){
+    dmg_seg_segmenter_upload(segmenter, (dmg_seg_upload_request){
         .target = (uint64_t)frame->clipboxes_buffer,
         .offset = 0,
         .source = clipboxes,
         .bytes  = clipboxes_count * sizeof(gpu_clipbox)
     });
 
-    dgs_segmenter_upload(segmenter, (dgs_upload_request){
+    dmg_seg_segmenter_upload(segmenter, (dmg_seg_upload_request){
         .target = (uint64_t)frame->instances_buffer,
         .offset = 0,
         .source = instances,
@@ -706,47 +706,47 @@ int cmg_abr_upload_cache(
     frame->vertex_constants = (gpu_vertex_constants){
         .resolution_width        = access.resolution_x,
         .resolution_height       = access.resolution_y,
-        .instances_buffer_index  = dgx_shader_resource_bind(hardware, dgx_resource_type_storage_buffer, frame->instances_buffer, &success),
-        .draw_items_buffer_index = dgx_shader_resource_bind(hardware, dgx_resource_type_storage_buffer, frame->draw_items_buffer, &success),
-        .glyphs_buffer_index     = dgx_shader_resource_bind(hardware, dgx_resource_type_storage_buffer, shared->glyph_buffer, &success),
+        .instances_buffer_index  = dmg_gfx_shader_resource_bind(hardware, dmg_gfx_resource_type_storage_buffer, frame->instances_buffer, &success),
+        .draw_items_buffer_index = dmg_gfx_shader_resource_bind(hardware, dmg_gfx_resource_type_storage_buffer, frame->draw_items_buffer, &success),
+        .glyphs_buffer_index     = dmg_gfx_shader_resource_bind(hardware, dmg_gfx_resource_type_storage_buffer, shared->glyph_buffer, &success),
     };
     frame->pixel_constants = (gpu_pixel_constants){
         .resolution_width   = access.resolution_x,
         .resolution_height  = access.resolution_y,
-        .clips_buffer_index = dgx_shader_resource_bind(hardware, dgx_resource_type_storage_buffer, frame->clipboxes_buffer, &success),
-        .sampler_index      = dgx_shader_resource_bind(hardware, dgx_resource_type_sampler, shared->sampler, &success),
+        .clips_buffer_index = dmg_gfx_shader_resource_bind(hardware, dmg_gfx_resource_type_storage_buffer, frame->clipboxes_buffer, &success),
+        .sampler_index      = dmg_gfx_shader_resource_bind(hardware, dmg_gfx_resource_type_sampler, shared->sampler, &success),
     };
 
     // Perform uploads
-    dgx_timeline* internal = NULL;
+    dmg_gfx_timeline* internal = NULL;
     uint64_t internal_itr = 0;
     
-    while (!dgx_segmenter_query_empty(segmenter)) {
-        if (internal) dgx_timeline_wait(internal, internal_itr);
+    while (!dmg_seg_segmenter_query_empty(segmenter)) {
+        if (internal) dmg_gfx_timeline_wait(internal, internal_itr);
         
-        uint64_t count; dgs_upload_request* requests;
-        dgs_segmenter_continue(segmenter, &count, &requests);
+        uint64_t count; dmg_seg_upload_request* requests;
+        dmg_seg_segmenter_continue(segmenter, &count, &requests);
 
-        int last_upload = dgx_segmenter_query_empty(segmenter);
+        int last_upload = dmg_seg_segmenter_query_empty(segmenter);
         if (!last_upload && !internal) {
-            internal = dgx_create_timeline(hardware, &(dgx_timeline_create_info){
+            internal = dmg_gfx_create_timeline(hardware, &(dmg_gfx_timeline_create_info){
                 .initial_value = 0
             });
         }
 
         // copy to staging memory
-        char* mapped = dgx_staging_memory_map(staging_memory, staging_memory_region_offset, staging_memory_region_size);
+        char* mapped = dmg_gfx_staging_memory_map(staging_memory, staging_memory_region_offset, staging_memory_region_size);
         uint64_t offset = 0;
         for (uint64_t i = 0; i < count; i++) {
-            dgs_upload_request req = requests[i];
+            dmg_seg_upload_request req = requests[i];
             memcpy(mapped + offset, req.source, req.bytes);
             offset += req.bytes;
         }
-        dgx_staging_memory_unmap(staging_memory);
+        dmg_gfx_staging_memory_unmap(staging_memory);
 
         // record rewrite list
-        frame->upload_list = dgx_create_command_list(hardware, &(dgx_command_list_create_info){
-            .domain = dgx_command_domain_transfer,
+        frame->upload_list = dmg_gfx_create_command_list(hardware, &(dmg_gfx_command_list_create_info){
+            .domain = dmg_gfx_command_domain_transfer,
             .aindex = command_list_allocator_index,
             .parent = frame->upload_list,
             .record = ui_upload_record,
@@ -759,8 +759,8 @@ int cmg_abr_upload_cache(
         });
 
         // Submit gpu work
-        dgx_timeline* timeline = last_upload ? signal_timeline : internal;
-        dgx_command_list_submit(1, &frame->upload_list, &(dgx_submit_info){
+        dmg_gfx_timeline* timeline = last_upload ? signal_timeline : internal;
+        dmg_gfx_command_list_submit(1, &frame->upload_list, &(dmg_gfx_submit_info){
             .domain_work_group  = transfer_work_group_index,
             .signal_count       = timeline ? 1 : 0,
             .signal_timelines   = &timeline,
@@ -768,13 +768,13 @@ int cmg_abr_upload_cache(
         });
     }
 
-    if (internal) dgx_free_timeline(internal);
+    if (internal) dmg_gfx_free_timeline(internal);
 
     // Mark to render
     frame->instances_to_render = instances_count;
 
 _cleanup: 
-    dgs_free_segmenter(segmenter);                  // Free segmenter
+    dmg_seg_free_segmenter(segmenter);                  // Free segmenter
     free(items); free(clipboxes); free(instances);  // Free allocated memory
     return success;
 }
@@ -785,17 +785,17 @@ void cmg_abr_gcmd_render(
 ) {
     single_frame* frame = &frames->frames[frame_idx % frames->count];
     if (frame->instances_to_render) {
-        dgx_gcmd_bind_graphics_pipeline(frames->owning_shared->pipeline);
+        dmg_gfx_gcmd_bind_graphics_pipeline(frames->owning_shared->pipeline);
 
-        dgx_gcmd_write_constants(
-            frames->owning_shared->pipeline, dgx_shader_stage_vertex, 0, sizeof(gpu_vertex_constants), &frame->vertex_constants
+        dmg_gfx_gcmd_write_constants(
+            frames->owning_shared->pipeline, dmg_gfx_shader_stage_vertex, 0, sizeof(gpu_vertex_constants), &frame->vertex_constants
         );
 
-        dgx_gcmd_write_constants(
-            frames->owning_shared->pipeline, dgx_shader_stage_pixel, 0, sizeof(gpu_pixel_constants), &frame->pixel_constants
+        dmg_gfx_gcmd_write_constants(
+            frames->owning_shared->pipeline, dmg_gfx_shader_stage_pixel, 0, sizeof(gpu_pixel_constants), &frame->pixel_constants
         );
 
-        dgx_gcmd_draw(0, 4, 0, frame->instances_to_render);
+        dmg_gfx_gcmd_draw(0, 4, 0, frame->instances_to_render);
     }
 }
 

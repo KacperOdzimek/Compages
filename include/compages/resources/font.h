@@ -34,12 +34,12 @@ Possible Optimizations:
 #include <stddef.h>
 
 typedef struct cmg_fnt_glyph {
-    dgx_uv_2d   atlas_position;
-    float       size_x;
-    float       size_y;
-    float       bearing_x;
-    float       bearing_y;
-    float       advance_x;
+    dmg_gfx_uv_2d   atlas_position;
+    float           size_x;
+    float           size_y;
+    float           bearing_x;
+    float           bearing_y;
+    float           advance_x;
 } cmg_fnt_glyph;
 
 typedef struct cmg_fnt_create_info {
@@ -49,12 +49,12 @@ typedef struct cmg_fnt_create_info {
 } cmg_fnt_create_info;
 
 typedef struct cmg_fnt_font cmg_fnt_font;
-cmg_fnt_font* cmg_fnt_create_font(dgx_hardware*, const cmg_fnt_create_info*);
+cmg_fnt_font* cmg_fnt_create_font(dmg_gfx_hardware*, const cmg_fnt_create_info*);
 void cmg_fnt_free_font(cmg_fnt_font*);
 
-dgx_texture* cmg_fnt_get_texture(const cmg_fnt_font*);
-cmg_fnt_glyph  cmg_fnt_get_glyph  (const cmg_fnt_font*, uint32_t codepoint);
-float        cmg_fnt_get_kerning(const cmg_fnt_font*, uint32_t left_codepoint, uint32_t right_codepoint);
+dmg_gfx_texture* cmg_fnt_get_texture(const cmg_fnt_font*);
+cmg_fnt_glyph    cmg_fnt_get_glyph  (const cmg_fnt_font*, uint32_t codepoint);
+float            cmg_fnt_get_kerning(const cmg_fnt_font*, uint32_t left_codepoint, uint32_t right_codepoint);
 
 float cmg_fnt_get_base_size    (const cmg_fnt_font*);
 float cmg_fnt_get_base_ascent  (const cmg_fnt_font*);
@@ -107,7 +107,7 @@ typedef struct kerning_pair_entry {
 } kerning_pair_entry;
 
 struct cmg_fnt_font {
-    dgx_hardware*       owning_hardware;
+    dmg_gfx_hardware*       owning_hardware;
 
     float               size;
     float               ascent;
@@ -120,7 +120,7 @@ struct cmg_fnt_font {
     uint32_t            kernings_count;
     kerning_pair_entry* kernings_array;
 
-    dgx_texture*        atlas_texture;
+    dmg_gfx_texture*        atlas_texture;
 };
 
 // deserialize little-endian 32-bit value
@@ -141,7 +141,7 @@ static inline float deserialize_f32(const unsigned char* b) {
     return val;
 }
 
-cmg_fnt_font* cmg_fnt_create_font(dgx_hardware* hardware, const cmg_fnt_create_info* info) {
+cmg_fnt_font* cmg_fnt_create_font(dmg_gfx_hardware* hardware, const cmg_fnt_create_info* info) {
     sht_view* view = info->file_view; uint32_t idx = 0;
 
     cmg_fnt_font* font = (cmg_fnt_font*)calloc(1, sizeof(cmg_fnt_font));
@@ -287,11 +287,11 @@ void cmg_fnt_free_font(cmg_fnt_font* font) {
     if (font == NULL) return;
     free(font->glyphs_array);
     free(font->kernings_array);
-    dgx_free_texture(font->atlas_texture);
+    dmg_gfx_free_texture(font->atlas_texture);
     free(font);
 }
 
-dgx_texture* cmg_fnt_get_texture(const cmg_fnt_font* font) {
+dmg_gfx_texture* cmg_fnt_get_texture(const cmg_fnt_font* font) {
     return font->atlas_texture;
 }
 
