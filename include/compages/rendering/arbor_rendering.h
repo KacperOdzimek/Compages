@@ -195,13 +195,13 @@ typedef struct gpu_instance {
 } gpu_instance;
 
 typedef struct gpu_draw_item {
-    arb_mat3x2  transform;
+    arb_mat3x2      transform;
     fnd_gfx_uv_2d   atlas_position;
-    int         texture_index;
-    int         clipbox_index;
-    uint32_t    shader_index;
-    int         rounding_pixel;
-    float       r, g, b, a;
+    int             texture_index;
+    int             clipbox_index;
+    uint32_t        shader_index;
+    int             rounding_pixel;
+    float           r, g, b, a;
 } gpu_draw_item;
 
 typedef struct gpu_clipbox {
@@ -343,16 +343,16 @@ void cmg_arb_free_shared(cmg_arb_shared* shared) {
 
 typedef struct single_frame {
     uint32_t                instances_to_render;
-    fnd_gfx_buffer*             instances_buffer;
-    fnd_gfx_buffer*             draw_items_buffer;
-    fnd_gfx_buffer*             clipboxes_buffer;
+    fnd_gfx_buffer*         instances_buffer;
+    fnd_gfx_buffer*         draw_items_buffer;
+    fnd_gfx_buffer*         clipboxes_buffer;
     gpu_vertex_constants    vertex_constants;
     gpu_pixel_constants     pixel_constants;
-    fnd_gfx_command_list*       upload_list;
+    fnd_gfx_command_list*   upload_list;
 } single_frame;
 
 struct cmg_arb_frames {
-    cmg_arb_shared*     owning_shared;
+    cmg_arb_shared* owning_shared;
     uint32_t        count;
     single_frame*   frames;
 };
@@ -437,17 +437,17 @@ static void glyphs_rewrite_record(void* raw_params) {
 }
 
 int cmg_arb_upload_cache(
-    arb_upload_access   access,
+    arb_upload_access       access,
     cmg_arb_shared*         shared,
     cmg_arb_frames*         frames,
-    uint32_t            frame_idx,
-    uint8_t             transfer_work_group_index,
-    uint8_t             command_list_allocator_index,
+    uint32_t                frame_idx,
+    uint8_t                 transfer_work_group_index,
+    uint8_t                 command_list_allocator_index,
     fnd_gfx_staging_memory* staging_memory,
-    uint64_t            staging_memory_region_offset,
-    uint64_t            staging_memory_region_size,
+    uint64_t                staging_memory_region_offset,
+    uint64_t                staging_memory_region_size,
     fnd_gfx_timeline*       signal_timeline,
-    uint64_t            signal_value
+    uint64_t                signal_value
 ) {
     fnd_gfx_hardware* hardware = shared->owning_hardware;
     single_frame* frame    = &frames->frames[frame_idx];
