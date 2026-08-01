@@ -7,8 +7,8 @@ This file provides simple system to render basic shapes: lines, triangles, recta
 Code info:
 - cmg_shp prefix
 - COMPAGES_SHAPES_IMPL macro to build
-- demiurg/graphics.h dependant
-- demiurg/linear_algebra.h dependant
+- fundatio/graphics.h dependant
+- fundatio/linear_algebra.h dependant
 
 ----------------------------------------------------------------
 Usage
@@ -24,19 +24,19 @@ Usage
 #ifndef COMPAGES_SHAPES_H
 #define COMPAGES_SHAPES_H
 
-#include "demiurg/platform/graphics.h"
-#include "demiurg/mathematics/linear_algebra.h"
+#include "fundatio/platform/graphics.h"
+#include "fundatio/mathematics/linear_algebra.h"
 
 // Shapes Rendering Shared Object
 
 typedef struct cmg_shp_shared_create_info {
-    dmg_gfx_pipeline_attachment_state   attachment_state;
-    dmg_gfx_shader_create_info          vertex_shader_info;
-    dmg_gfx_shader_create_info          pixel_shader_info;
+    fnd_gfx_pipeline_attachment_state   attachment_state;
+    fnd_gfx_shader_create_info          vertex_shader_info;
+    fnd_gfx_shader_create_info          pixel_shader_info;
 } cmg_shp_shared_create_info;
 
 typedef struct cmg_shp_shared cmg_shp_shared;
-cmg_shp_shared* cmg_shp_create_shared(dmg_gfx_hardware*, const cmg_shp_shared_create_info* info);
+cmg_shp_shared* cmg_shp_create_shared(fnd_gfx_hardware*, const cmg_shp_shared_create_info* info);
 void cmg_shp_free_shared(cmg_shp_shared*);
 
 // Shapes Rendering Frame Contextes
@@ -47,7 +47,7 @@ typedef struct cmg_shp_frames_create_info {
 } cmg_shp_frames_create_info;
 
 typedef struct cmg_shp_frames cmg_shp_frames;
-cmg_shp_frames* cmg_shp_create_frames(dmg_gfx_hardware*, const cmg_shp_frames_create_info* info);
+cmg_shp_frames* cmg_shp_create_frames(fnd_gfx_hardware*, const cmg_shp_frames_create_info* info);
 void cmg_shp_free_frames(cmg_shp_frames*);
 
 // shorthand not to pass frame in flight to every function
@@ -71,10 +71,10 @@ int cmg_shp_upload(
     cmg_shp_context*       context,
     uint8_t             transfer_work_group_index,
     uint8_t             command_list_allocator_index,
-    dmg_gfx_staging_memory* staging_memory,
+    fnd_gfx_staging_memory* staging_memory,
     uint64_t            staging_memory_region_offset,
     uint64_t            staging_memory_region_size,
-    dmg_gfx_timeline*       signal_timeline,
+    fnd_gfx_timeline*       signal_timeline,
     uint64_t            signal_value
 );
 
@@ -99,22 +99,22 @@ void cmg_shp_set_line_thickness(
 
 void cmg_shp_line(
     cmg_shp_context* context,
-    dmg_lia_vec2 begin, dmg_lia_vec2 end
+    fnd_lia_vec2 begin, fnd_lia_vec2 end
 );
 
 void cmg_shp_triangle(
     cmg_shp_context* context,
-    dmg_lia_vec2 a, dmg_lia_vec2 b, dmg_lia_vec2 c
+    fnd_lia_vec2 a, fnd_lia_vec2 b, fnd_lia_vec2 c
 );
 
 void cmg_shp_rect(
     cmg_shp_context* context,
-    dmg_lia_vec2 first_corner, dmg_lia_vec2 second_corner
+    fnd_lia_vec2 first_corner, fnd_lia_vec2 second_corner
 );
 
 void cmg_shp_circle(
     cmg_shp_context* context,
-    dmg_lia_vec2 center, float radius
+    fnd_lia_vec2 center, float radius
 );
 
 #endif // COMPAGES_SHAPES_H
@@ -148,46 +148,46 @@ typedef struct gpu_constants {
 */
 
 struct cmg_shp_shared {
-    dmg_gfx_hardware*   owning_hardware;
-    dmg_gfx_pipeline*   pipeline;
+    fnd_gfx_hardware*   owning_hardware;
+    fnd_gfx_pipeline*   pipeline;
 };
 
-cmg_shp_shared* cmg_shp_create_shared(dmg_gfx_hardware* hardware, const cmg_shp_shared_create_info* info) {
+cmg_shp_shared* cmg_shp_create_shared(fnd_gfx_hardware* hardware, const cmg_shp_shared_create_info* info) {
     cmg_shp_shared* shared = calloc(1, sizeof(cmg_shp_shared)); if (!shared) return NULL;
     shared->owning_hardware = hardware;
 
     // Pipeline Shaders
-    dmg_gfx_shader* vertex_shader = dmg_gfx_create_shader(shared->owning_hardware, &info->vertex_shader_info);
-    dmg_gfx_shader* pixel_shader  = dmg_gfx_create_shader(shared->owning_hardware, &info->pixel_shader_info);
+    fnd_gfx_shader* vertex_shader = fnd_gfx_create_shader(shared->owning_hardware, &info->vertex_shader_info);
+    fnd_gfx_shader* pixel_shader  = fnd_gfx_create_shader(shared->owning_hardware, &info->pixel_shader_info);
 
     if (!vertex_shader || !pixel_shader) {
-        dmg_gfx_free_shader(vertex_shader);
-        dmg_gfx_free_shader(pixel_shader);
+        fnd_gfx_free_shader(vertex_shader);
+        fnd_gfx_free_shader(pixel_shader);
         goto _fail;
     }
 
-    shared->pipeline = dmg_gfx_create_pipeline(shared->owning_hardware, &(dmg_gfx_pipeline_create_info){
+    shared->pipeline = fnd_gfx_create_pipeline(shared->owning_hardware, &(fnd_gfx_pipeline_create_info){
         .attachment_state = info->attachment_state,
         .shader_stages  = {
-            .shaders[dmg_gfx_shader_stage_vertex]   = vertex_shader,
-            .constants[dmg_gfx_shader_stage_vertex] = sizeof(gpu_constants),
-            .shaders[dmg_gfx_shader_stage_pixel]    = pixel_shader,
-            .constants[dmg_gfx_shader_stage_pixel]  = sizeof(gpu_constants)
+            .shaders[fnd_gfx_shader_stage_vertex]   = vertex_shader,
+            .constants[fnd_gfx_shader_stage_vertex] = sizeof(gpu_constants),
+            .shaders[fnd_gfx_shader_stage_pixel]    = pixel_shader,
+            .constants[fnd_gfx_shader_stage_pixel]  = sizeof(gpu_constants)
         },
         .input_assembler_state = {
-            .topology = dmg_gfx_primitive_topology_triangle_list
+            .topology = fnd_gfx_primitive_topology_triangle_list
         },
         .rasterizer_state = {
             .scissor_enable     = 0,
             .depth_clamp_enable = 0,
-            .fill_mode          = dmg_gfx_fill_mode_solid,
-            .cull_mode          = dmg_gfx_cull_mode_none
+            .fill_mode          = fnd_gfx_fill_mode_solid,
+            .cull_mode          = fnd_gfx_cull_mode_none
         },
         .blend_state = {
             .blend_enable   = 1,
-            .blend_op       = dmg_gfx_blend_op_add,
-            .src_factor     = dmg_gfx_blend_factor_src_alpha,
-            .dst_factor     = dmg_gfx_blend_factor_one_minus_src_alpha,
+            .blend_op       = fnd_gfx_blend_op_add,
+            .src_factor     = fnd_gfx_blend_factor_src_alpha,
+            .dst_factor     = fnd_gfx_blend_factor_one_minus_src_alpha,
         },
         .depth_stencil_state = {
             .depth_test_enable      = 0,
@@ -196,8 +196,8 @@ cmg_shp_shared* cmg_shp_create_shared(dmg_gfx_hardware* hardware, const cmg_shp_
         }
     });
 
-    dmg_gfx_free_shader(vertex_shader);
-    dmg_gfx_free_shader(pixel_shader);
+    fnd_gfx_free_shader(vertex_shader);
+    fnd_gfx_free_shader(pixel_shader);
 
     if (!shared->pipeline) goto _fail;
     return shared;
@@ -209,7 +209,7 @@ _fail:
 
 void cmg_shp_free_shared(cmg_shp_shared* shared) {
     if (!shared) return;
-    dmg_gfx_free_pipeline(shared->pipeline);
+    fnd_gfx_free_pipeline(shared->pipeline);
     free(shared);
 }
 
@@ -222,19 +222,19 @@ typedef struct single_frame {
     uint64_t            capacity;       // Arena capacity in gpu instances
     gpu_instance*       arena;          // Arena data
     uint32_t            to_draw;        // GPU instances to draw
-    dmg_gfx_buffer*         buffer;         // GPU instances buffer
+    fnd_gfx_buffer*         buffer;         // GPU instances buffer
     uint32_t            bind;           // Buffer bind point
-    dmg_gfx_command_list*   upload_list;    // List used to upload instances
+    fnd_gfx_command_list*   upload_list;    // List used to upload instances
 } single_frame;
 
 struct cmg_shp_frames {
-    dmg_gfx_hardware*   owning_hardware;
+    fnd_gfx_hardware*   owning_hardware;
     cmg_shp_shared*    owning_shared;
     uint32_t        in_flight;
     single_frame*   frames;
 };
 
-cmg_shp_frames* cmg_shp_create_frames(dmg_gfx_hardware* hardware, const cmg_shp_frames_create_info* info) {
+cmg_shp_frames* cmg_shp_create_frames(fnd_gfx_hardware* hardware, const cmg_shp_frames_create_info* info) {
     if (!hardware || !info->shared) goto _fail;
 
     cmg_shp_frames* frames = calloc(1, sizeof(cmg_shp_frames)); 
@@ -260,8 +260,8 @@ _fail:
 void cmg_shp_free_frames(cmg_shp_frames* frames) {
     if (!frames) return;
     for (uint32_t i = 0; i < frames->in_flight; i++) {
-        dmg_gfx_free_buffer(frames->frames[i].buffer);
-        dmg_gfx_free_command_list(frames->frames[i].upload_list);
+        fnd_gfx_free_buffer(frames->frames[i].buffer);
+        fnd_gfx_free_command_list(frames->frames[i].upload_list);
         free(frames->frames[i].arena);
     }
     free(frames->frames);
@@ -274,15 +274,15 @@ void cmg_shp_reset(cmg_shp_context* context) {
 }
 
 typedef struct upload_params {
-    dmg_gfx_staging_memory* staging;
-    dmg_gfx_buffer*         buffer;
+    fnd_gfx_staging_memory* staging;
+    fnd_gfx_buffer*         buffer;
     uint64_t            uploaded;
     uint64_t            upload;
 } upload_params;
 
 static void upload_record(void* raw_params) {
     upload_params* params = raw_params;
-    dmg_gfx_tcmd_copy_staging_memory_to_buffer(
+    fnd_gfx_tcmd_copy_staging_memory_to_buffer(
         params->staging, params->buffer,
         0, params->uploaded * sizeof(gpu_instance), params->upload * sizeof(gpu_instance)
     );
@@ -296,54 +296,54 @@ int cmg_shp_upload(
     cmg_shp_context*       context,
     uint8_t             transfer_work_group_index,
     uint8_t             command_list_allocator_index,
-    dmg_gfx_staging_memory* staging_memory,
+    fnd_gfx_staging_memory* staging_memory,
     uint64_t            staging_memory_region_offset,
     uint64_t            staging_memory_region_size,
-    dmg_gfx_timeline*       signal_timeline,
+    fnd_gfx_timeline*       signal_timeline,
     uint64_t            signal_value
 ) {
     single_frame* frame    = &context->frames->frames[context->index];
-    dmg_gfx_hardware* hardware = context->frames->owning_hardware;
+    fnd_gfx_hardware* hardware = context->frames->owning_hardware;
 
     // Nothing to upload
     if (frame->position == 0) {
-        dmg_gfx_timeline_signal(signal_timeline, signal_value); return 1;
+        fnd_gfx_timeline_signal(signal_timeline, signal_value); return 1;
     }
 
     // Whether succeeded to bind resources
     int bind_success = 1;
 
     // Ensure buffer space
-    if (!frame->buffer || dmg_gfx_buffer_query_bytes(frame->buffer) < frame->position * sizeof(gpu_instance)) {
-        dmg_gfx_buffer* new_buffer = NULL;
+    if (!frame->buffer || fnd_gfx_buffer_query_bytes(frame->buffer) < frame->position * sizeof(gpu_instance)) {
+        fnd_gfx_buffer* new_buffer = NULL;
         uint64_t    new_cap[2] = {frame->capacity, frame->position};
         for (int i = 0; i < 2; i++) {
-            new_buffer = dmg_gfx_create_buffer(hardware, &(dmg_gfx_buffer_create_info){
+            new_buffer = fnd_gfx_create_buffer(hardware, &(fnd_gfx_buffer_create_info){
                 .bytes  = new_cap[i] * sizeof(gpu_instance),
-                .usage  = dmg_gfx_buffer_usage_storage,
-                .access = dmg_gfx_memory_access_staging_write
+                .usage  = fnd_gfx_buffer_usage_storage,
+                .access = fnd_gfx_memory_access_staging_write
             });
             if (new_buffer) break;
         }
         if (new_buffer) {
-            dmg_gfx_free_buffer(frame->buffer);
+            fnd_gfx_free_buffer(frame->buffer);
             frame->buffer = new_buffer;
-            frame->bind = dmg_gfx_shader_resource_bind(hardware, dmg_gfx_resource_type_storage_buffer, new_buffer, &bind_success);
+            frame->bind = fnd_gfx_shader_resource_bind(hardware, fnd_gfx_resource_type_storage_buffer, new_buffer, &bind_success);
         }
     }
 
     // Safe return
     if (!frame->buffer) {
-        dmg_gfx_timeline_signal(signal_timeline, signal_value); return 0;
+        fnd_gfx_timeline_signal(signal_timeline, signal_value); return 0;
     }
 
     // Cap written instances to buffer capacity
-    uint64_t instances_to_write = min_u64(dmg_gfx_buffer_query_bytes(frame->buffer) / sizeof(gpu_instance), frame->position);
+    uint64_t instances_to_write = min_u64(fnd_gfx_buffer_query_bytes(frame->buffer) / sizeof(gpu_instance), frame->position);
     uint64_t staging_capacity   = staging_memory_region_size / sizeof(gpu_instance);
     uint64_t buffer_uploaded    = 0;
 
     // If wont do in single upload, alloc internal timeline
-    dmg_gfx_timeline* internal = instances_to_write > staging_capacity ? dmg_gfx_create_timeline(hardware, &(dmg_gfx_timeline_create_info){
+    fnd_gfx_timeline* internal = instances_to_write > staging_capacity ? fnd_gfx_create_timeline(hardware, &(fnd_gfx_timeline_create_info){
         .initial_value = 0
     }) : NULL; if (!internal) instances_to_write = min_u64(instances_to_write, staging_capacity);
     uint64_t internal_itr = 0;
@@ -352,12 +352,12 @@ int cmg_shp_upload(
     while (instances_to_write) {
         uint64_t upload = min_u64(instances_to_write, staging_capacity);
 
-        char* mem = dmg_gfx_staging_memory_map(staging_memory, staging_memory_region_offset, staging_memory_region_size);
+        char* mem = fnd_gfx_staging_memory_map(staging_memory, staging_memory_region_offset, staging_memory_region_size);
         memcpy(mem, &frame->arena[buffer_uploaded], upload * sizeof(gpu_instance));
-        dmg_gfx_staging_memory_unmap(staging_memory);
+        fnd_gfx_staging_memory_unmap(staging_memory);
 
-        frame->upload_list = dmg_gfx_create_command_list(hardware, &(dmg_gfx_command_list_create_info){
-            .domain = dmg_gfx_command_domain_transfer,
+        frame->upload_list = fnd_gfx_create_command_list(hardware, &(fnd_gfx_command_list_create_info){
+            .domain = fnd_gfx_command_domain_transfer,
             .aindex = command_list_allocator_index,
             .parent = frame->upload_list,
             .record = upload_record,
@@ -371,8 +371,8 @@ int cmg_shp_upload(
 
         int last_upload = instances_to_write <= staging_capacity;
 
-        dmg_gfx_timeline* timeline = last_upload ? signal_timeline : internal;
-        dmg_gfx_command_list_submit(1, &frame->upload_list, &(dmg_gfx_submit_info){
+        fnd_gfx_timeline* timeline = last_upload ? signal_timeline : internal;
+        fnd_gfx_command_list_submit(1, &frame->upload_list, &(fnd_gfx_submit_info){
             .domain_work_group  = transfer_work_group_index,
             .signal_count       = timeline ? 1 : 0,
             .signal_timelines   = &timeline,
@@ -380,7 +380,7 @@ int cmg_shp_upload(
         });
 
         // Wait for upload to end
-        if (!last_upload) dmg_gfx_timeline_wait(internal, internal_itr);
+        if (!last_upload) fnd_gfx_timeline_wait(internal, internal_itr);
 
         instances_to_write -= upload;
         buffer_uploaded    += upload;
@@ -390,7 +390,7 @@ int cmg_shp_upload(
     frame->to_draw = buffer_uploaded;
 
     // Free temporary
-    dmg_gfx_free_timeline(internal);
+    fnd_gfx_free_timeline(internal);
 
     // Successful if succeeded to bind
     return bind_success;
@@ -399,15 +399,15 @@ int cmg_shp_upload(
 void cmg_shp_gcmd_render(cmg_shp_context* context) {
     single_frame* frame = &context->frames->frames[context->index];
     if (frame->to_draw) {
-        dmg_gfx_gcmd_bind_graphics_pipeline(context->frames->owning_shared->pipeline);
+        fnd_gfx_gcmd_bind_graphics_pipeline(context->frames->owning_shared->pipeline);
         gpu_constants constants = {.buffer_index = frame->bind};
-        dmg_gfx_gcmd_write_constants(
-            context->frames->owning_shared->pipeline, dmg_gfx_shader_stage_vertex, 0, (sizeof(gpu_constants)), &constants
+        fnd_gfx_gcmd_write_constants(
+            context->frames->owning_shared->pipeline, fnd_gfx_shader_stage_vertex, 0, (sizeof(gpu_constants)), &constants
         );
-        dmg_gfx_gcmd_write_constants(
-            context->frames->owning_shared->pipeline, dmg_gfx_shader_stage_pixel, 0, (sizeof(gpu_constants)), &constants
+        fnd_gfx_gcmd_write_constants(
+            context->frames->owning_shared->pipeline, fnd_gfx_shader_stage_pixel, 0, (sizeof(gpu_constants)), &constants
         );
-        dmg_gfx_gcmd_draw(0, 3, 0, frame->to_draw);
+        fnd_gfx_gcmd_draw(0, 3, 0, frame->to_draw);
     }
 }
 
@@ -457,7 +457,7 @@ void cmg_shp_set_line_thickness(cmg_shp_context* context, float line_thickness) 
     context->line_thickness = line_thickness;
 }
 
-void cmg_shp_line(cmg_shp_context* context, dmg_lia_vec2 begin, dmg_lia_vec2 end) {
+void cmg_shp_line(cmg_shp_context* context, fnd_lia_vec2 begin, fnd_lia_vec2 end) {
     single_frame* frame = &context->frames->frames[context->index];
 
     float dx = end.x - begin.x;
@@ -487,11 +487,11 @@ void cmg_shp_line(cmg_shp_context* context, dmg_lia_vec2 begin, dmg_lia_vec2 end
     );
 }
 
-void cmg_shp_triangle(cmg_shp_context* context, dmg_lia_vec2 a, dmg_lia_vec2 b, dmg_lia_vec2 c) {
+void cmg_shp_triangle(cmg_shp_context* context, fnd_lia_vec2 a, fnd_lia_vec2 b, fnd_lia_vec2 c) {
     emit_triangle(context, a.x, a.y, b.x, b.y, c.x, c.y, 0, 0, -1.0f); // unrounded
 }
 
-void cmg_shp_rect(cmg_shp_context* context, dmg_lia_vec2 first_corner, dmg_lia_vec2 second_corner) {
+void cmg_shp_rect(cmg_shp_context* context, fnd_lia_vec2 first_corner, fnd_lia_vec2 second_corner) {
     emit_triangle(
         context,
         first_corner.x,  first_corner.y,
@@ -509,7 +509,7 @@ void cmg_shp_rect(cmg_shp_context* context, dmg_lia_vec2 first_corner, dmg_lia_v
     );
 }
 
-void cmg_shp_circle(cmg_shp_context* context, dmg_lia_vec2 center, float radius) {
+void cmg_shp_circle(cmg_shp_context* context, fnd_lia_vec2 center, float radius) {
     emit_triangle(context, 
         center.x - radius, center.y - radius, 
         center.x - radius, center.y + radius, 

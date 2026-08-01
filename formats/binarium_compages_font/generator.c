@@ -1,5 +1,5 @@
 /*
-    This file generates SeshatCompagesFont (scf) from other font formats.
+    This file generates BinariumCompagesFont (bcf) from other font formats.
     Supported right now:
     - truefont
 */
@@ -16,8 +16,8 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "../depedency/stb_truetype.h"
 
-#define SESHAT_IMPL
-#include "seshat/seshat.h"
+#define BINARIUM_IMPL
+#include "binarium/binarium.h"
 
 // Conifg
 
@@ -95,11 +95,11 @@ int serialize();
 
 int main() {
     if (generate()) {
-        fprintf(stderr, "Failed to generate demigurg font\n");
+        fprintf(stderr, "Failed to generate font\n");
         return 1;
     }
     if (serialize()) {
-        fprintf(stderr, "Failed to save demigurg font\n");
+        fprintf(stderr, "Failed to save font\n");
         return 1;
     }
     printf("Success!");
@@ -377,8 +377,8 @@ int serialize(void) {
         }
     }
 
-    sht_builder* builder = NULL;
-    if (sht_create_builder(&builder) != sht_status_ok) {
+    biu_builder* builder = NULL;
+    if (biu_create_builder(&builder) != biu_status_ok) {
         fprintf(stderr, "Failed to create builder\n");
         fclose(out);
         return 1;
@@ -396,7 +396,7 @@ int serialize(void) {
     uint8_t* glyphs_buffer = malloc(glyphs_bytes);
     if (!glyphs_buffer) {
         fprintf(stderr, "Failed to allocate glyph buffer\n");
-        sht_free_builder(builder);
+        biu_free_builder(builder);
         fclose(out);
         return 1;
     }
@@ -449,7 +449,7 @@ int serialize(void) {
     if (!kerning_buffer) {
         fprintf(stderr, "Failed to allocate kerning buffer\n");
         free(glyphs_buffer);
-        sht_free_builder(builder);
+        biu_free_builder(builder);
         fclose(out);
         return 1;
     }
@@ -468,23 +468,23 @@ int serialize(void) {
     // ---------------------------------------------------------------------
     // Archive entries
 
-    sht_builder_add_text(
+    biu_builder_add_text(
         builder,
         "format",
-        strlen("SeshatCompagesFont"),
-        "SeshatCompagesFont",
-        sht_access_read_unowned
+        strlen("BinariumCompagesFont"),
+        "BinariumCompagesFont",
+        biu_access_read_unowned
     );
 
-    sht_builder_add_float64(builder, "base_size", font_base_size);
-    sht_builder_add_float64(builder, "ascent",    font_ascent);
-    sht_builder_add_float64(builder, "descent",   font_descent);
-    sht_builder_add_float64(builder, "line_gap",  font_line_gap);
+    biu_builder_add_float64(builder, "base_size", font_base_size);
+    biu_builder_add_float64(builder, "ascent",    font_ascent);
+    biu_builder_add_float64(builder, "descent",   font_descent);
+    biu_builder_add_float64(builder, "line_gap",  font_line_gap);
 
-    sht_builder_add_int64(builder, "texture_width",  atlas_texture_width);
-    sht_builder_add_int64(builder, "texture_height", atlas_texture_height);
+    biu_builder_add_int64(builder, "texture_width",  atlas_texture_width);
+    biu_builder_add_int64(builder, "texture_height", atlas_texture_height);
 
-    sht_builder_add_binary_compressed(
+    biu_builder_add_binary_compressed(
         builder,
         "texture",
         (uint64_t)atlas_texture_width * atlas_texture_height,
@@ -492,7 +492,7 @@ int serialize(void) {
         0
     );
 
-    sht_builder_add_binary_compressed(
+    biu_builder_add_binary_compressed(
         builder,
         "glyphs",
         glyphs_bytes,
@@ -500,7 +500,7 @@ int serialize(void) {
         0
     );
 
-    sht_builder_add_binary_compressed(
+    biu_builder_add_binary_compressed(
         builder,
         "kerning",
         kerning_bytes,
@@ -514,12 +514,12 @@ int serialize(void) {
     void* archive = NULL;
     uint64_t archive_size = 0;
 
-    if (sht_builder_serialize(builder, &archive, &archive_size) != sht_status_ok) {
+    if (biu_builder_serialize(builder, &archive, &archive_size) != biu_status_ok) {
         fprintf(stderr, "Failed to serialize archive\n");
 
         free(glyphs_buffer);
         free(kerning_buffer);
-        sht_free_builder(builder);
+        biu_free_builder(builder);
         fclose(out);
         return 1;
     }
@@ -531,7 +531,7 @@ int serialize(void) {
     free(archive);
     free(glyphs_buffer);
     free(kerning_buffer);
-    sht_free_builder(builder);
+    biu_free_builder(builder);
 
     free(glyph_entires);
     free(kerning_entries);

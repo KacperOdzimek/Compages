@@ -2,19 +2,19 @@
 ----------------------------------------------------------------
 Contents:
 This file provides a `font` object, which consists of glyph SDF texture atlas and glyph metrics.
-The font object is created from a seshat-compages-font file, which can be generated out of other font formats, using
-    Compages/formats/seshat_compages_font
+The font object is created from a binarium-compages-font file, which can be generated out of other font formats, using
+    Compages/formats/binarium_compages_font
 
 ----------------------------------------------------------------
 Code info:
 - cmg_fnt prefix
 - COMPAGES_FONT_IMPL macro to build
-- demiurg/graphics.h dependant
-- seshat/seshat.h dependant
+- fundatio/graphics.h dependant
+- binarium/binarium.h dependant
 
 ----------------------------------------------------------------
 Usage:
-- Create font object, with a valid seshat-compages-font linked in create info
+- Create font object, with a valid binarium-compages-font linked in create info
 - Lookup info->out fields to get atlas position within file; upload to font texture (no offset, full dimensions)
 - Use get functions to query font/glyph metrics
 - cmg_fnt_get_glyph and cmg_fnt_get_kerning are O(log n) operations
@@ -29,12 +29,12 @@ Possible Optimizations:
 #ifndef COMPAGES_FONR_H
 #define COMPAGES_FONR_H
 
-#include "demiurg/platform/graphics.h"
-#include "seshat/seshat.h"
+#include "fundatio/platform/graphics.h"
+#include "binarium/binarium.h"
 #include <stddef.h>
 
 typedef struct cmg_fnt_glyph {
-    dmg_gfx_uv_2d   atlas_position;
+    fnd_gfx_uv_2d   atlas_position;
     float           size_x;
     float           size_y;
     float           bearing_x;
@@ -43,16 +43,16 @@ typedef struct cmg_fnt_glyph {
 } cmg_fnt_glyph;
 
 typedef struct cmg_fnt_create_info {
-    sht_view*       file_view;          // The seshat compages file view
+    biu_view*       file_view;          // The binarium compages file view
     uint64_t*       out_bytes;          // Byte size of sdf texture
     unsigned char** out_sdf_texture;    // Mallocated decompressed texture to be uploaded
 } cmg_fnt_create_info;
 
 typedef struct cmg_fnt_font cmg_fnt_font;
-cmg_fnt_font* cmg_fnt_create_font(dmg_gfx_hardware*, const cmg_fnt_create_info*);
+cmg_fnt_font* cmg_fnt_create_font(fnd_gfx_hardware*, const cmg_fnt_create_info*);
 void cmg_fnt_free_font(cmg_fnt_font*);
 
-dmg_gfx_texture* cmg_fnt_get_texture(const cmg_fnt_font*);
+fnd_gfx_texture* cmg_fnt_get_texture(const cmg_fnt_font*);
 cmg_fnt_glyph    cmg_fnt_get_glyph  (const cmg_fnt_font*, uint32_t codepoint);
 float            cmg_fnt_get_kerning(const cmg_fnt_font*, uint32_t left_codepoint, uint32_t right_codepoint);
 
@@ -107,7 +107,7 @@ typedef struct kerning_pair_entry {
 } kerning_pair_entry;
 
 struct cmg_fnt_font {
-    dmg_gfx_hardware*       owning_hardware;
+    fnd_gfx_hardware*       owning_hardware;
 
     float               size;
     float               ascent;
@@ -120,7 +120,7 @@ struct cmg_fnt_font {
     uint32_t            kernings_count;
     kerning_pair_entry* kernings_array;
 
-    dmg_gfx_texture*        atlas_texture;
+    fnd_gfx_texture*        atlas_texture;
 };
 
 // deserialize little-endian 32-bit value
@@ -141,8 +141,8 @@ static inline float deserialize_f32(const unsigned char* b) {
     return val;
 }
 
-cmg_fnt_font* cmg_fnt_create_font(dmg_gfx_hardware* hardware, const cmg_fnt_create_info* info) {
-    sht_view* view = info->file_view; uint32_t idx = 0;
+cmg_fnt_font* cmg_fnt_create_font(fnd_gfx_hardware* hardware, const cmg_fnt_create_info* info) {
+    biu_view* view = info->file_view; uint32_t idx = 0;
 
     cmg_fnt_font* font = (cmg_fnt_font*)calloc(1, sizeof(cmg_fnt_font));
     if (!font) return NULL;
@@ -150,55 +150,55 @@ cmg_fnt_font* cmg_fnt_create_font(dmg_gfx_hardware* hardware, const cmg_fnt_crea
 
     // Validate format identifier
     const uint8_t* format_str = NULL; uint64_t format_len = 0;
-    if (sht_view_find(view, "format", &idx) != sht_status_ok ||
-        sht_view_get_as_bytes(view, idx, &format_len, &format_str) != sht_status_ok ||
-        format_len != strlen("SeshatCompagesFont") ||
-        memcmp(format_str, "SeshatCompagesFont", format_len) != 0) {
+    if (biu_view_find(view, "format", &idx) != biu_status_ok ||
+        biu_view_get_as_bytes(view, idx, &format_len, &format_str) != biu_status_ok ||
+        format_len != strlen("BinariumCompagesFont") ||
+        memcmp(format_str, "BinariumCompagesFont", format_len) != 0) {
         goto _fail;
     }
 
     double d_val = 0.0; int64_t i_val = 0;
 
     // Read Font Base Metrics
-    if (sht_view_find(view, "base_size", &idx) == sht_status_ok &&
-        sht_view_get_as_float64(view, idx, &d_val) == sht_status_ok) {
+    if (biu_view_find(view, "base_size", &idx) == biu_status_ok &&
+        biu_view_get_as_float64(view, idx, &d_val) == biu_status_ok) {
         font->size = (float)d_val;
     } else goto _fail;
 
-    if (sht_view_find(view, "ascent", &idx) == sht_status_ok &&
-        sht_view_get_as_float64(view, idx, &d_val) == sht_status_ok) {
+    if (biu_view_find(view, "ascent", &idx) == biu_status_ok &&
+        biu_view_get_as_float64(view, idx, &d_val) == biu_status_ok) {
         font->ascent = (float)d_val;
     } else goto _fail;
 
-    if (sht_view_find(view, "descent", &idx) == sht_status_ok &&
-        sht_view_get_as_float64(view, idx, &d_val) == sht_status_ok) {
+    if (biu_view_find(view, "descent", &idx) == biu_status_ok &&
+        biu_view_get_as_float64(view, idx, &d_val) == biu_status_ok) {
         font->descent = (float)d_val;
     } else goto _fail;
 
-    if (sht_view_find(view, "line_gap", &idx) == sht_status_ok &&
-        sht_view_get_as_float64(view, idx, &d_val) == sht_status_ok) {
+    if (biu_view_find(view, "line_gap", &idx) == biu_status_ok &&
+        biu_view_get_as_float64(view, idx, &d_val) == biu_status_ok) {
         font->line_gap = (float)d_val;
     } else goto _fail;
 
     // Read Atlas Dimensions
     int64_t tex_w = 0, tex_h = 0;
-    if (sht_view_find(view, "texture_width", &idx) != sht_status_ok ||
-        sht_view_get_as_int64(view, idx, &tex_w) != sht_status_ok) goto _fail;
+    if (biu_view_find(view, "texture_width", &idx) != biu_status_ok ||
+        biu_view_get_as_int64(view, idx, &tex_w) != biu_status_ok) goto _fail;
 
-    if (sht_view_find(view, "texture_height", &idx) != sht_status_ok ||
-        sht_view_get_as_int64(view, idx, &tex_h) != sht_status_ok) goto _fail;
+    if (biu_view_find(view, "texture_height", &idx) != biu_status_ok ||
+        biu_view_get_as_int64(view, idx, &tex_h) != biu_status_ok) goto _fail;
 
     if (tex_w > UINT32_MAX || tex_h > UINT32_MAX) goto _fail;
 
     // Decompress Texture Data
-    if (sht_view_find(view, "texture", &idx) == sht_status_ok) {
+    if (biu_view_find(view, "texture", &idx) == biu_status_ok) {
         uint64_t uncompressed_size = 0;
-        if (sht_view_get_as_uncompressed_size(view, idx, &uncompressed_size) != sht_status_ok) goto _fail;
+        if (biu_view_get_as_uncompressed_size(view, idx, &uncompressed_size) != biu_status_ok) goto _fail;
 
         unsigned char* sdf_tex = (unsigned char*)malloc(uncompressed_size);
         if (!sdf_tex) goto _fail;
 
-        if (sht_view_get_as_decompress(view, idx, uncompressed_size, sdf_tex) != sht_status_ok) {
+        if (biu_view_get_as_decompress(view, idx, uncompressed_size, sdf_tex) != biu_status_ok) {
             free(sdf_tex);
             goto _fail;
         }
@@ -209,14 +209,14 @@ cmg_fnt_font* cmg_fnt_create_font(dmg_gfx_hardware* hardware, const cmg_fnt_crea
     }
 
     // Decompress and Parse Glyphs Array
-    if (sht_view_find(view, "glyphs", &idx) == sht_status_ok) {
+    if (biu_view_find(view, "glyphs", &idx) == biu_status_ok) {
         uint64_t uncompressed_size = 0;
-        if (sht_view_get_as_uncompressed_size(view, idx, &uncompressed_size) != sht_status_ok) goto _fail;
+        if (biu_view_get_as_uncompressed_size(view, idx, &uncompressed_size) != biu_status_ok) goto _fail;
 
         uint8_t* raw_glyphs = (uint8_t*)malloc(uncompressed_size);
         if (!raw_glyphs) goto _fail;
 
-        if (sht_view_get_as_decompress(view, idx, uncompressed_size, raw_glyphs) != sht_status_ok) {
+        if (biu_view_get_as_decompress(view, idx, uncompressed_size, raw_glyphs) != biu_status_ok) {
             free(raw_glyphs);
             goto _fail;
         }
@@ -249,13 +249,13 @@ cmg_fnt_font* cmg_fnt_create_font(dmg_gfx_hardware* hardware, const cmg_fnt_crea
     }
 
     // Decompress and Parse Kerning Pairs
-    if (sht_view_find(view, "kerning", &idx) != sht_status_ok) goto _fail;
+    if (biu_view_find(view, "kerning", &idx) != biu_status_ok) goto _fail;
     uint64_t uncompressed_size = 0;
-    if (sht_view_get_as_uncompressed_size(view, idx, &uncompressed_size) == sht_status_ok && uncompressed_size > 0) {
+    if (biu_view_get_as_uncompressed_size(view, idx, &uncompressed_size) == biu_status_ok && uncompressed_size > 0) {
         uint8_t* raw_kerning = (uint8_t*)malloc(uncompressed_size);
         if (!raw_kerning) goto _fail;
 
-        if (sht_view_get_as_decompress(view, idx, uncompressed_size, raw_kerning) != sht_status_ok) {
+        if (biu_view_get_as_decompress(view, idx, uncompressed_size, raw_kerning) != biu_status_ok) {
             free(raw_kerning);
             goto _fail;
         }
@@ -281,18 +281,18 @@ cmg_fnt_font* cmg_fnt_create_font(dmg_gfx_hardware* hardware, const cmg_fnt_crea
     }
 
     // Create texture
-    font->atlas_texture = dmg_gfx_create_texture(hardware, &(dmg_gfx_texture_create_info){
-        .type   = dmg_gfx_texture_type_2d,
-        .usage  = dmg_gfx_texture_usage_sampled,
-        .dimensions = (dmg_gfx_texture_dimensions){
+    font->atlas_texture = fnd_gfx_create_texture(hardware, &(fnd_gfx_texture_create_info){
+        .type   = fnd_gfx_texture_type_2d,
+        .usage  = fnd_gfx_texture_usage_sampled,
+        .dimensions = (fnd_gfx_texture_dimensions){
             .width  = tex_w,
             .height = tex_h,
             .depth  = 1
         },
         .mipmap_layers  = 1,
         .array_length   = 1,
-        .format         = dmg_gfx_texture_format_r8_unorm,
-        .memory_access  = dmg_gfx_memory_access_staging_write
+        .format         = fnd_gfx_texture_format_r8_unorm,
+        .memory_access  = fnd_gfx_memory_access_staging_write
     }); if (!font->atlas_texture) goto _fail;
 
     return font;
@@ -304,11 +304,11 @@ void cmg_fnt_free_font(cmg_fnt_font* font) {
     if (font == NULL) return;
     free(font->glyphs_array);
     free(font->kernings_array);
-    dmg_gfx_free_texture(font->atlas_texture);
+    fnd_gfx_free_texture(font->atlas_texture);
     free(font);
 }
 
-dmg_gfx_texture* cmg_fnt_get_texture(const cmg_fnt_font* font) {
+fnd_gfx_texture* cmg_fnt_get_texture(const cmg_fnt_font* font) {
     return font->atlas_texture;
 }
 

@@ -1,11 +1,11 @@
-# Seshat Compages Font
-Is a Seshat Version 0 File for fonts storage.
+# Binarium Compages Font
+Is a Binarium Version 0 File for fonts storage.
 
 ## Archive Contents
 
 | Entry Name | Type | Description |
 | - | - | - |
-|format| UTF-8 | Identifier: "SeshatCompagesFont" |
+|format| UTF-8 | Identifier: "BinariumCompagesFont" |
 |base_size |float64	| Font base size.
 |ascent	| float64	| Font ascent.
 |descent |	float64	| Font descent.
