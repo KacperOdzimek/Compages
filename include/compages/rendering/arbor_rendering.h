@@ -13,47 +13,42 @@
 // Implementation Injections - User define those functions
 // Functions shall return non-zero at successful find
 
-int cmg_abr_injection_query_image(const char* image, fnd_gfx_texture** texture_out, fnd_gfx_uv_2d* uv_out);
-int cmg_abr_injection_query_font(const char* font, cmg_fnt_font** font_out);
-
-// ===========================
-// Text Layout
-
-arb_text_layout_func_signature cmg_abr_text_layout_func;
+int cmg_arb_injection_query_image(const char* image, fnd_gfx_texture** texture_out, fnd_gfx_uv_2d* uv_out);
+int cmg_arb_injection_query_font(const char* font, cmg_fnt_font** font_out);
 
 // ===========================
 // Shared
 
-typedef struct cmg_abr_shared_create_info {
+typedef struct cmg_arb_shared_create_info {
     fnd_gfx_pipeline_attachment_state   attachment_state;
     fnd_gfx_shader_create_info          vertex_shader_info;
     fnd_gfx_shader_create_info          pixel_shader_info;
-} cmg_abr_shared_create_info;
+} cmg_arb_shared_create_info;
 
-typedef struct cmg_abr_shared cmg_abr_shared;
-cmg_abr_shared* cmg_abr_create_shared(fnd_gfx_hardware*, const cmg_abr_shared_create_info*);
-void cmg_abr_free_shared(cmg_abr_shared*);
+typedef struct cmg_arb_shared cmg_arb_shared;
+cmg_arb_shared* cmg_arb_create_shared(fnd_gfx_hardware*, const cmg_arb_shared_create_info*);
+void cmg_arb_free_shared(cmg_arb_shared*);
 
 // ===========================
 // Frames
 
-typedef struct cmg_abr_frames_create_info {
-    cmg_abr_shared* shared;
+typedef struct cmg_arb_frames_create_info {
+    cmg_arb_shared* shared;
     uint32_t    count;
-} cmg_abr_frames_create_info;
+} cmg_arb_frames_create_info;
 
-typedef struct cmg_abr_frames cmg_abr_frames;
-cmg_abr_frames* cmg_abr_create_frames(fnd_gfx_hardware*, const cmg_abr_frames_create_info*);
-void cmg_abr_free_frames(cmg_abr_frames*);
+typedef struct cmg_arb_frames cmg_arb_frames;
+cmg_arb_frames* cmg_arb_create_frames(fnd_gfx_hardware*, const cmg_arb_frames_create_info*);
+void cmg_arb_free_frames(cmg_arb_frames*);
 
 // ===========================
 // Rendering Functions
 
 // Returns non-zero at success
-int cmg_abr_upload_cache(
+int cmg_arb_upload_cache(
     arb_upload_access       access,
-    cmg_abr_shared*         shared,
-    cmg_abr_frames*         frames,
+    cmg_arb_shared*         shared,
+    cmg_arb_frames*         frames,
     uint32_t                frame_idx,
     uint8_t                 transfer_work_group_index,
     uint8_t                 command_list_allocator_index,
@@ -64,8 +59,8 @@ int cmg_abr_upload_cache(
     uint64_t                signal_value
 );
 
-void cmg_abr_gcmd_render(
-    cmg_abr_frames*         frames,
+void cmg_arb_gcmd_render(
+    cmg_arb_frames*         frames,
     uint32_t                frame
 );
 
@@ -94,7 +89,7 @@ typedef struct gpu_glyph {
 // ===========================
 // Text Layout
 
-void cmg_abr_text_layout_func(
+void arb_injection_text_layout(
     const arb_text_data*    text_data,          // Text data to layout
     int                     width_constrain,    // Given width, 0 == unlimited width
     size_t*                 out_count,          // Out count of glyphs
@@ -102,7 +97,7 @@ void cmg_abr_text_layout_func(
     int*                    out_width,          // Out pixel width of text box
     int*                    out_height          // Out pixel height of text box
 ) {
-    cmg_fnt_font* font; if (!cmg_abr_injection_query_font(text_data->font, &font)) return;
+    cmg_fnt_font* font; if (!cmg_arb_injection_query_font(text_data->font, &font)) return;
     const char* text = text_data->text;
 
     // If text empty or font invalid
@@ -250,7 +245,7 @@ static inline fnd_gfx_buffer* create_glyph_ssbo(fnd_gfx_hardware* hardware, uint
 // ===========================
 // Shared Object
 
-struct cmg_abr_shared {
+struct cmg_arb_shared {
     fnd_gfx_hardware*       owning_hardware;
     fnd_gfx_sampler*        sampler;
     fnd_gfx_pipeline*       pipeline;
@@ -258,8 +253,8 @@ struct cmg_abr_shared {
     fnd_gfx_buffer*         glyph_buffer;
 };
 
-cmg_abr_shared* cmg_abr_create_shared(fnd_gfx_hardware* hardware, const cmg_abr_shared_create_info* info) {
-    cmg_abr_shared* shared = calloc(1, sizeof(cmg_abr_shared)); if (!shared) return NULL;
+cmg_arb_shared* cmg_arb_create_shared(fnd_gfx_hardware* hardware, const cmg_arb_shared_create_info* info) {
+    cmg_arb_shared* shared = calloc(1, sizeof(cmg_arb_shared)); if (!shared) return NULL;
     shared->owning_hardware = hardware;
 
     // Sampler
@@ -330,11 +325,11 @@ cmg_abr_shared* cmg_abr_create_shared(fnd_gfx_hardware* hardware, const cmg_abr_
     return shared;
 
 _fail:
-    cmg_abr_free_shared(shared);
+    cmg_arb_free_shared(shared);
     return NULL;
 }
 
-void cmg_abr_free_shared(cmg_abr_shared* shared) {
+void cmg_arb_free_shared(cmg_arb_shared* shared) {
     if (!shared) return;
     fnd_gfx_free_sampler(shared->sampler);
     fnd_gfx_free_pipeline(shared->pipeline);
@@ -356,16 +351,16 @@ typedef struct single_frame {
     fnd_gfx_command_list*       upload_list;
 } single_frame;
 
-struct cmg_abr_frames {
-    cmg_abr_shared*     owning_shared;
+struct cmg_arb_frames {
+    cmg_arb_shared*     owning_shared;
     uint32_t        count;
     single_frame*   frames;
 };
 
-cmg_abr_frames* cmg_abr_create_frames(fnd_gfx_hardware* hardware, const cmg_abr_frames_create_info* info) {
-    cmg_abr_shared* shared = info->shared;
+cmg_arb_frames* cmg_arb_create_frames(fnd_gfx_hardware* hardware, const cmg_arb_frames_create_info* info) {
+    cmg_arb_shared* shared = info->shared;
 
-    cmg_abr_frames* frames = calloc(1, sizeof(cmg_abr_frames));  if (!frames) return NULL;
+    cmg_arb_frames* frames = calloc(1, sizeof(cmg_arb_frames));  if (!frames) return NULL;
     frames->owning_shared = shared;
     
     // create frames
@@ -388,11 +383,11 @@ cmg_abr_frames* cmg_abr_create_frames(fnd_gfx_hardware* hardware, const cmg_abr_
     return frames;
 
 _fail:
-    cmg_abr_free_frames(frames);
+    cmg_arb_free_frames(frames);
     return NULL;
 }
 
-void cmg_abr_free_frames(cmg_abr_frames* frames) {
+void cmg_arb_free_frames(cmg_arb_frames* frames) {
     if (!frames) return;
     for (uint32_t i = 0; i < frames->count; i++) {
         single_frame* frame = &frames->frames[i];
@@ -441,10 +436,10 @@ static void glyphs_rewrite_record(void* raw_params) {
     );
 }
 
-int cmg_abr_upload_cache(
+int cmg_arb_upload_cache(
     arb_upload_access   access,
-    cmg_abr_shared*         shared,
-    cmg_abr_frames*         frames,
+    cmg_arb_shared*         shared,
+    cmg_arb_frames*         frames,
     uint32_t            frame_idx,
     uint8_t             transfer_work_group_index,
     uint8_t             command_list_allocator_index,
@@ -567,7 +562,7 @@ int cmg_abr_upload_cache(
 
         if (req.is_box_not_text) {
             int texture_index = 0; fnd_gfx_texture* texture; fnd_gfx_uv_2d uv;
-            if (req.box.data.image && cmg_abr_injection_query_image(req.box.data.image, &texture, &uv)) {
+            if (req.box.data.image && cmg_arb_injection_query_image(req.box.data.image, &texture, &uv)) {
                 texture_index = fnd_gfx_shader_resource_bind(
                     hardware, fnd_gfx_resource_type_sampled_texture, texture, &success
                 );
@@ -594,7 +589,7 @@ int cmg_abr_upload_cache(
             arb_text_data text_data =  req.text.data;
             if (!part) continue;
 
-            cmg_fnt_font* font_tex; if (!cmg_abr_injection_query_font(text_data.font, &font_tex)) continue;
+            cmg_fnt_font* font_tex; if (!cmg_arb_injection_query_font(text_data.font, &font_tex)) continue;
             uint32_t texture_index = fnd_gfx_shader_resource_bind(
                 hardware, fnd_gfx_resource_type_sampled_texture, cmg_fnt_get_texture(font_tex), &success
             );
@@ -779,8 +774,8 @@ _cleanup:
     return success;
 }
 
-void cmg_abr_gcmd_render(
-    cmg_abr_frames* frames,
+void cmg_arb_gcmd_render(
+    cmg_arb_frames* frames,
     uint32_t    frame_idx
 ) {
     single_frame* frame = &frames->frames[frame_idx % frames->count];
