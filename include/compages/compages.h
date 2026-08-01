@@ -19,4 +19,7 @@ Code info:
 #define COMPAGES_FONT_IMPL
 #include "compages/resources/font.h"
 
+#define COMPAGES_SYNCHRONISED_WINDOW_IMPL
+#include "compages/utility/synchronised_window.h"
+
 #endif
