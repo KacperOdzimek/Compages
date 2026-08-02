@@ -22,4 +22,11 @@ Code info:
 #define COMPAGES_SYNCHRONISED_WINDOW_IMPL
 #include "compages/utility/synchronised_window.h"
 
+#else
+
+#include "compages/rendering/shapes_rendering.h"
+#include "compages/rendering/arbor_rendering.h"
+#include "compages/resources/font.h"
+#include "compages/utility/synchronised_window.h"
+
 #endif
