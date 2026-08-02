@@ -46,17 +46,17 @@ void cmg_arb_free_frames(cmg_arb_frames*);
 
 // Returns non-zero at success
 int cmg_arb_upload_cache(
-    arb_upload_access       access,
-    cmg_arb_shared*         shared,
-    cmg_arb_frames*         frames,
-    uint32_t                frame_idx,
-    uint8_t                 transfer_work_group_index,
-    uint8_t                 command_list_allocator_index,
-    fnd_gfx_staging_memory* staging_memory,
-    uint64_t                staging_memory_region_offset,
-    uint64_t                staging_memory_region_size,
-    fnd_gfx_timeline*       signal_timeline,
-    uint64_t                signal_value
+    arb_upload_access   access,
+    cmg_arb_shared*     shared,
+    cmg_arb_frames*     frames,
+    uint32_t            frame_idx,
+    uint8_t             transfer_work_group_index,
+    uint8_t             commands_allocator_index,
+    fnd_gfx_staging*    staging,
+    uint64_t            staging_region_offset,
+    uint64_t            staging_region_size,
+    fnd_gfx_timeline*   signal_timeline,
+    uint64_t            signal_value
 );
 
 void cmg_arb_gcmd_render(
@@ -348,7 +348,7 @@ typedef struct single_frame {
     fnd_gfx_buffer*         clipboxes_buffer;
     gpu_vertex_constants    vertex_constants;
     gpu_pixel_constants     pixel_constants;
-    fnd_gfx_command_list*   upload_list;
+    fnd_gfx_commands*       upload_list;
 } single_frame;
 
 struct cmg_arb_frames {
@@ -394,7 +394,7 @@ void cmg_arb_free_frames(cmg_arb_frames* frames) {
         fnd_gfx_free_buffer(frame->instances_buffer);
         fnd_gfx_free_buffer(frame->draw_items_buffer);
         fnd_gfx_free_buffer(frame->clipboxes_buffer);
-        fnd_gfx_free_command_list(frame->upload_list);
+        fnd_gfx_free_commands(frame->upload_list);
     }
     free(frames->frames);
     free(frames);
@@ -406,7 +406,7 @@ void cmg_arb_free_frames(cmg_arb_frames* frames) {
 typedef struct ui_upload_params {
     uint64_t                count;
     fnd_seg_upload_request* requests;
-    fnd_gfx_staging_memory* staging;
+    fnd_gfx_staging* staging;
     uint64_t                offset;
 } ui_upload_params;
 
@@ -415,7 +415,7 @@ static void ui_upload_record(void* raw_params) {
     uint64_t offset = 0;
     for (uint64_t i = 0; i < params->count; i++) {
         fnd_seg_upload_request req = params->requests[i];
-        fnd_gfx_tcmd_copy_staging_memory_to_buffer(
+        fnd_gfx_tcmd_copy_staging_to_buffer(
             params->staging, (fnd_gfx_buffer*)req.target,
             params->offset + offset, req.offset, req.bytes
         );
@@ -437,17 +437,17 @@ static void glyphs_rewrite_record(void* raw_params) {
 }
 
 int cmg_arb_upload_cache(
-    arb_upload_access       access,
-    cmg_arb_shared*         shared,
-    cmg_arb_frames*         frames,
-    uint32_t                frame_idx,
-    uint8_t                 transfer_work_group_index,
-    uint8_t                 command_list_allocator_index,
-    fnd_gfx_staging_memory* staging_memory,
-    uint64_t                staging_memory_region_offset,
-    uint64_t                staging_memory_region_size,
-    fnd_gfx_timeline*       signal_timeline,
-    uint64_t                signal_value
+    arb_upload_access   access,
+    cmg_arb_shared*     shared,
+    cmg_arb_frames*     frames,
+    uint32_t            frame_idx,
+    uint8_t             transfer_work_group_index,
+    uint8_t             commands_allocator_index,
+    fnd_gfx_staging*    staging,
+    uint64_t            staging_region_offset,
+    uint64_t            staging_region_size,
+    fnd_gfx_timeline*   signal_timeline,
+    uint64_t            signal_value
 ) {
     fnd_gfx_hardware* hardware = shared->owning_hardware;
     single_frame* frame    = &frames->frames[frame_idx];
@@ -457,7 +457,7 @@ int cmg_arb_upload_cache(
 
     // Create segmenter
     fnd_seg_segmenter* segmenter = fnd_seg_create_segmenter(&(fnd_seg_segmenter_create_info){
-        .bandwidth = staging_memory_region_size
+        .bandwidth = staging_region_size
     }); if (!segmenter) goto _cleanup;
 
     // Free garbage text
@@ -493,7 +493,7 @@ int cmg_arb_upload_cache(
             if (!new_buffer) continue;
 
             // Rewrite contents
-            fnd_gfx_command_list* rewrite_list = fnd_gfx_create_command_list(hardware, &(fnd_gfx_command_list_create_info){
+            fnd_gfx_commands* rewrite_list = fnd_gfx_create_commands(hardware, &(fnd_gfx_commands_create_info){
                 .domain = fnd_gfx_command_domain_transfer,
                 .aindex = transfer_work_group_index,
                 .record = glyphs_rewrite_record,
@@ -504,8 +504,8 @@ int cmg_arb_upload_cache(
             });
 
             // Submit
-            fnd_gfx_command_list_submit(1, &rewrite_list, &(fnd_gfx_submit_info){.domain_work_group = 0});
-            fnd_gfx_hardware_wait_idle(hardware); fnd_gfx_free_command_list(rewrite_list);
+            fnd_gfx_commands_submit(1, &rewrite_list, &(fnd_gfx_submit_info){.domain_work_group = 0});
+            fnd_gfx_hardware_wait_idle(hardware); fnd_gfx_free_commands(rewrite_list);
 
             // Since rewrited, pick new buffer
             fnd_gfx_free_buffer(shared->glyph_buffer);
@@ -730,32 +730,32 @@ int cmg_arb_upload_cache(
         }
 
         // copy to staging memory
-        char* mapped = fnd_gfx_staging_memory_map(staging_memory, staging_memory_region_offset, staging_memory_region_size);
+        char* mapped = fnd_gfx_staging_map(staging, staging_region_offset, staging_region_size);
         uint64_t offset = 0;
         for (uint64_t i = 0; i < count; i++) {
             fnd_seg_upload_request req = requests[i];
             memcpy(mapped + offset, req.source, req.bytes);
             offset += req.bytes;
         }
-        fnd_gfx_staging_memory_unmap(staging_memory);
+        fnd_gfx_staging_unmap(staging);
 
         // record rewrite list
-        frame->upload_list = fnd_gfx_create_command_list(hardware, &(fnd_gfx_command_list_create_info){
+        frame->upload_list = fnd_gfx_create_commands(hardware, &(fnd_gfx_commands_create_info){
             .domain = fnd_gfx_command_domain_transfer,
-            .aindex = command_list_allocator_index,
+            .aindex = commands_allocator_index,
             .parent = frame->upload_list,
             .record = ui_upload_record,
             .params = &(ui_upload_params){
                 .count    = count,
                 .requests = requests,
-                .staging  = staging_memory,
-                .offset   = staging_memory_region_offset
+                .staging  = staging,
+                .offset   = staging_region_offset
             }
         });
 
         // Submit gpu work
         fnd_gfx_timeline* timeline = last_upload ? signal_timeline : internal;
-        fnd_gfx_command_list_submit(1, &frame->upload_list, &(fnd_gfx_submit_info){
+        fnd_gfx_commands_submit(1, &frame->upload_list, &(fnd_gfx_submit_info){
             .domain_work_group  = transfer_work_group_index,
             .signal_count       = timeline ? 1 : 0,
             .signal_timelines   = &timeline,

@@ -68,13 +68,13 @@ void cmg_shp_reset(
 // Uploads draw requests to gpu
 // Returns non-zero at success
 int cmg_shp_upload(
-    cmg_shp_context*       context,
+    cmg_shp_context*    context,
     uint8_t             transfer_work_group_index,
-    uint8_t             command_list_allocator_index,
-    fnd_gfx_staging_memory* staging_memory,
-    uint64_t            staging_memory_region_offset,
-    uint64_t            staging_memory_region_size,
-    fnd_gfx_timeline*       signal_timeline,
+    uint8_t             commands_allocator_index,
+    fnd_gfx_staging*    staging,
+    uint64_t            staging_region_offset,
+    uint64_t            staging_region_size,
+    fnd_gfx_timeline*   signal_timeline,
     uint64_t            signal_value
 );
 
@@ -224,7 +224,7 @@ typedef struct single_frame {
     uint32_t            to_draw;        // GPU instances to draw
     fnd_gfx_buffer*         buffer;         // GPU instances buffer
     uint32_t            bind;           // Buffer bind point
-    fnd_gfx_command_list*   upload_list;    // List used to upload instances
+    fnd_gfx_commands*   upload_list;    // List used to upload instances
 } single_frame;
 
 struct cmg_shp_frames {
@@ -261,7 +261,7 @@ void cmg_shp_free_frames(cmg_shp_frames* frames) {
     if (!frames) return;
     for (uint32_t i = 0; i < frames->in_flight; i++) {
         fnd_gfx_free_buffer(frames->frames[i].buffer);
-        fnd_gfx_free_command_list(frames->frames[i].upload_list);
+        fnd_gfx_free_commands(frames->frames[i].upload_list);
         free(frames->frames[i].arena);
     }
     free(frames->frames);
@@ -274,7 +274,7 @@ void cmg_shp_reset(cmg_shp_context* context) {
 }
 
 typedef struct upload_params {
-    fnd_gfx_staging_memory* staging;
+    fnd_gfx_staging* staging;
     fnd_gfx_buffer*         buffer;
     uint64_t            uploaded;
     uint64_t            upload;
@@ -282,7 +282,7 @@ typedef struct upload_params {
 
 static void upload_record(void* raw_params) {
     upload_params* params = raw_params;
-    fnd_gfx_tcmd_copy_staging_memory_to_buffer(
+    fnd_gfx_tcmd_copy_staging_to_buffer(
         params->staging, params->buffer,
         0, params->uploaded * sizeof(gpu_instance), params->upload * sizeof(gpu_instance)
     );
@@ -295,10 +295,10 @@ static uint64_t min_u64(uint64_t l, uint64_t r) {
 int cmg_shp_upload(
     cmg_shp_context*       context,
     uint8_t             transfer_work_group_index,
-    uint8_t             command_list_allocator_index,
-    fnd_gfx_staging_memory* staging_memory,
-    uint64_t            staging_memory_region_offset,
-    uint64_t            staging_memory_region_size,
+    uint8_t             commands_allocator_index,
+    fnd_gfx_staging* staging,
+    uint64_t            staging_region_offset,
+    uint64_t            staging_region_size,
     fnd_gfx_timeline*       signal_timeline,
     uint64_t            signal_value
 ) {
@@ -339,7 +339,7 @@ int cmg_shp_upload(
 
     // Cap written instances to buffer capacity
     uint64_t instances_to_write = min_u64(fnd_gfx_buffer_query_bytes(frame->buffer) / sizeof(gpu_instance), frame->position);
-    uint64_t staging_capacity   = staging_memory_region_size / sizeof(gpu_instance);
+    uint64_t staging_capacity   = staging_region_size / sizeof(gpu_instance);
     uint64_t buffer_uploaded    = 0;
 
     // If wont do in single upload, alloc internal timeline
@@ -352,17 +352,17 @@ int cmg_shp_upload(
     while (instances_to_write) {
         uint64_t upload = min_u64(instances_to_write, staging_capacity);
 
-        char* mem = fnd_gfx_staging_memory_map(staging_memory, staging_memory_region_offset, staging_memory_region_size);
+        char* mem = fnd_gfx_staging_map(staging, staging_region_offset, staging_region_size);
         memcpy(mem, &frame->arena[buffer_uploaded], upload * sizeof(gpu_instance));
-        fnd_gfx_staging_memory_unmap(staging_memory);
+        fnd_gfx_staging_unmap(staging);
 
-        frame->upload_list = fnd_gfx_create_command_list(hardware, &(fnd_gfx_command_list_create_info){
+        frame->upload_list = fnd_gfx_create_commands(hardware, &(fnd_gfx_commands_create_info){
             .domain = fnd_gfx_command_domain_transfer,
-            .aindex = command_list_allocator_index,
+            .aindex = commands_allocator_index,
             .parent = frame->upload_list,
             .record = upload_record,
             .params = &(upload_params){
-                .staging  = staging_memory,
+                .staging  = staging,
                 .buffer   = frame->buffer,
                 .uploaded = buffer_uploaded,
                 .upload   = upload
@@ -372,7 +372,7 @@ int cmg_shp_upload(
         int last_upload = instances_to_write <= staging_capacity;
 
         fnd_gfx_timeline* timeline = last_upload ? signal_timeline : internal;
-        fnd_gfx_command_list_submit(1, &frame->upload_list, &(fnd_gfx_submit_info){
+        fnd_gfx_commands_submit(1, &frame->upload_list, &(fnd_gfx_submit_info){
             .domain_work_group  = transfer_work_group_index,
             .signal_count       = timeline ? 1 : 0,
             .signal_timelines   = &timeline,
