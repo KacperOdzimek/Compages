@@ -22,11 +22,15 @@ Code info:
 #define COMPAGES_SYNCHRONISED_WINDOW_IMPL
 #include "compages/utility/synchronised_window.h"
 
+#define COMPAGES_UPLOADER_IMPL
+#include "compages/utility/staging_uploader.h"
+
 #else
 
 #include "compages/rendering/shapes_rendering.h"
 #include "compages/rendering/arbor_rendering.h"
 #include "compages/resources/font.h"
 #include "compages/utility/synchronised_window.h"
+#include "compages/utility/staging_uploader.h"
 
 #endif
