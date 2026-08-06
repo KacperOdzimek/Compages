@@ -26,8 +26,8 @@ Possible Optimizations:
     perform O(1) array access within range - this would be faster
 */
 
-#ifndef COMPAGES_FONR_H
-#define COMPAGES_FONR_H
+#ifndef COMPAGES_FONT_H
+#define COMPAGES_FONT_H
 
 #include "fundatio/platform/graphics.h"
 #include "binarium/binarium.h"
@@ -88,7 +88,7 @@ static inline int cmg_fnt_utf8_decode(const char* str, size_t itr, uint32_t* cod
     return 1;
 }
 
-#endif // COMPAGES_FONR_H
+#endif // COMPAGES_FONT_H
 
 #ifdef COMPAGES_FONT_IMPL
 
