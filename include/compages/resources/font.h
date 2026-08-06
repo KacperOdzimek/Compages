@@ -26,8 +26,8 @@ Possible Optimizations:
     perform O(1) array access within range - this would be faster
 */
 
-#ifndef COMPAGES_FONR_H
-#define COMPAGES_FONR_H
+#ifndef COMPAGES_FONT_H
+#define COMPAGES_FONT_H
 
 #include "fundatio/platform/graphics.h"
 #include "binarium/binarium.h"
@@ -52,14 +52,15 @@ typedef struct cmg_fnt_font cmg_fnt_font;
 cmg_fnt_font* cmg_fnt_create_font(fnd_gfx_hardware*, const cmg_fnt_create_info*);
 void cmg_fnt_free_font(cmg_fnt_font*);
 
-fnd_gfx_texture* cmg_fnt_get_texture(const cmg_fnt_font*);
-cmg_fnt_glyph    cmg_fnt_get_glyph  (const cmg_fnt_font*, uint32_t codepoint);
-float            cmg_fnt_get_kerning(const cmg_fnt_font*, uint32_t left_codepoint, uint32_t right_codepoint);
+fnd_gfx_texture* cmg_fnt_font_get_texture(const cmg_fnt_font*);
 
-float cmg_fnt_get_base_size    (const cmg_fnt_font*);
-float cmg_fnt_get_base_ascent  (const cmg_fnt_font*);
-float cmg_fnt_get_base_descent (const cmg_fnt_font*);
-float cmg_fnt_get_base_line_gap(const cmg_fnt_font*);
+float cmg_fnt_font_get_base_size    (const cmg_fnt_font*);
+float cmg_fnt_font_get_base_ascent  (const cmg_fnt_font*);
+float cmg_fnt_font_get_base_descent (const cmg_fnt_font*);
+float cmg_fnt_font_get_base_line_gap(const cmg_fnt_font*);
+
+cmg_fnt_glyph    cmg_fnt_font_get_glyph  (const cmg_fnt_font*, uint32_t codepoint);
+float            cmg_fnt_font_get_kerning(const cmg_fnt_font*, uint32_t left_codepoint, uint32_t right_codepoint);
 
 // UTF8 iteration helper, returns pointer advance
 static inline int cmg_fnt_utf8_decode(const char* str, size_t itr, uint32_t* codepoint) {
@@ -87,7 +88,7 @@ static inline int cmg_fnt_utf8_decode(const char* str, size_t itr, uint32_t* cod
     return 1;
 }
 
-#endif // COMPAGES_FONR_H
+#endif // COMPAGES_FONT_H
 
 #ifdef COMPAGES_FONT_IMPL
 
@@ -308,11 +309,11 @@ void cmg_fnt_free_font(cmg_fnt_font* font) {
     free(font);
 }
 
-fnd_gfx_texture* cmg_fnt_get_texture(const cmg_fnt_font* font) {
+fnd_gfx_texture* cmg_fnt_font_get_texture(const cmg_fnt_font* font) {
     return font->atlas_texture;
 }
 
-cmg_fnt_glyph cmg_fnt_get_glyph(const cmg_fnt_font* font, uint32_t codepoint) {
+cmg_fnt_glyph cmg_fnt_font_get_glyph(const cmg_fnt_font* font, uint32_t codepoint) {
     int left = 0;
     int right = (int)font->glyphs_count - 1;
 
@@ -329,7 +330,7 @@ cmg_fnt_glyph cmg_fnt_get_glyph(const cmg_fnt_font* font, uint32_t codepoint) {
     return (cmg_fnt_glyph){0};
 }
 
-float cmg_fnt_get_kerning(
+float cmg_fnt_font_get_kerning(
     const cmg_fnt_font* font,
     uint32_t left_codepoint,
     uint32_t right_codepoint
@@ -353,19 +354,19 @@ float cmg_fnt_get_kerning(
     return 0.0f;
 }
 
-float cmg_fnt_get_base_size(const cmg_fnt_font* font) {
+float cmg_fnt_font_get_base_size(const cmg_fnt_font* font) {
     return font->size;
 }
 
-float cmg_fnt_get_base_ascent(const cmg_fnt_font* font) {
+float cmg_fnt_font_get_base_ascent(const cmg_fnt_font* font) {
     return font->ascent;
 }
 
-float cmg_fnt_get_base_descent(const cmg_fnt_font* font) {
+float cmg_fnt_font_get_base_descent(const cmg_fnt_font* font) {
     return font->descent;
 }
 
-float cmg_fnt_get_base_line_gap(const cmg_fnt_font* font) {
+float cmg_fnt_font_get_base_line_gap(const cmg_fnt_font* font) {
     return font->line_gap;
 }
 

@@ -46,17 +46,17 @@ void cmg_arb_free_frames(cmg_arb_frames*);
 
 // Returns non-zero at success
 int cmg_arb_upload_cache(
-    arb_upload_access       access,
-    cmg_arb_shared*         shared,
-    cmg_arb_frames*         frames,
-    uint32_t                frame_idx,
-    uint8_t                 transfer_work_group_index,
-    uint8_t                 command_list_allocator_index,
-    fnd_gfx_staging_memory* staging_memory,
-    uint64_t                staging_memory_region_offset,
-    uint64_t                staging_memory_region_size,
-    fnd_gfx_timeline*       signal_timeline,
-    uint64_t                signal_value
+    arb_upload_access   access,
+    cmg_arb_shared*     shared,
+    cmg_arb_frames*     frames,
+    uint32_t            frame_idx,
+    uint8_t             transfer_work_group_index,
+    uint8_t             commands_allocator_index,
+    fnd_gfx_staging*    staging,
+    uint64_t            staging_region_offset,
+    uint64_t            staging_region_size,
+    fnd_gfx_timeline*   signal_timeline,
+    uint64_t            signal_value
 );
 
 void cmg_arb_gcmd_render(
@@ -121,12 +121,12 @@ void arb_injection_text_layout(
     gpu_glyph* glyphs = glyph_count ? malloc(sizeof(gpu_glyph) * glyph_count) : NULL;
 
     // Find font scale
-    const float font_scale = text_data->size / cmg_fnt_get_base_size(font);
+    const float font_scale = text_data->size / cmg_fnt_font_get_base_size(font);
 
     // Populate glyphs buffer
-    const float ascent      = cmg_fnt_get_base_ascent(font)   * font_scale;
-    const float descent     = cmg_fnt_get_base_descent(font)  * font_scale;
-    const float line_gap    = cmg_fnt_get_base_line_gap(font) * font_scale;
+    const float ascent      = cmg_fnt_font_get_base_ascent(font)   * font_scale;
+    const float descent     = cmg_fnt_font_get_base_descent(font)  * font_scale;
+    const float line_gap    = cmg_fnt_font_get_base_line_gap(font) * font_scale;
     const float line_height = ascent - descent + line_gap;
 
     float    pen_x      = 0.0f;
@@ -148,10 +148,10 @@ void arb_injection_text_layout(
         }
 
         // Kerning between consecutive glyphs on the same line
-        if (prev_cp) pen_x += cmg_fnt_get_kerning(font, prev_cp, cp);
+        if (prev_cp) pen_x += cmg_fnt_font_get_kerning(font, prev_cp, cp);
 
         // Write glyph
-        const cmg_fnt_glyph g = cmg_fnt_get_glyph(font, cp);
+        const cmg_fnt_glyph g = cmg_fnt_font_get_glyph(font, cp);
         glyphs[glyph_idx++] = (gpu_glyph){
             .atlas_position = g.atlas_position,
             .off_x          = pen_x + g.bearing_x * font_scale,
@@ -195,13 +195,13 @@ typedef struct gpu_instance {
 } gpu_instance;
 
 typedef struct gpu_draw_item {
-    arb_mat3x2  transform;
+    arb_mat3x2      transform;
     fnd_gfx_uv_2d   atlas_position;
-    int         texture_index;
-    int         clipbox_index;
-    uint32_t    shader_index;
-    int         rounding_pixel;
-    float       r, g, b, a;
+    int             texture_index;
+    int             clipbox_index;
+    uint32_t        shader_index;
+    int             rounding_pixel;
+    float           r, g, b, a;
 } gpu_draw_item;
 
 typedef struct gpu_clipbox {
@@ -343,16 +343,16 @@ void cmg_arb_free_shared(cmg_arb_shared* shared) {
 
 typedef struct single_frame {
     uint32_t                instances_to_render;
-    fnd_gfx_buffer*             instances_buffer;
-    fnd_gfx_buffer*             draw_items_buffer;
-    fnd_gfx_buffer*             clipboxes_buffer;
+    fnd_gfx_buffer*         instances_buffer;
+    fnd_gfx_buffer*         draw_items_buffer;
+    fnd_gfx_buffer*         clipboxes_buffer;
     gpu_vertex_constants    vertex_constants;
     gpu_pixel_constants     pixel_constants;
-    fnd_gfx_command_list*       upload_list;
+    fnd_gfx_commands*       upload_list;
 } single_frame;
 
 struct cmg_arb_frames {
-    cmg_arb_shared*     owning_shared;
+    cmg_arb_shared* owning_shared;
     uint32_t        count;
     single_frame*   frames;
 };
@@ -394,7 +394,7 @@ void cmg_arb_free_frames(cmg_arb_frames* frames) {
         fnd_gfx_free_buffer(frame->instances_buffer);
         fnd_gfx_free_buffer(frame->draw_items_buffer);
         fnd_gfx_free_buffer(frame->clipboxes_buffer);
-        fnd_gfx_free_command_list(frame->upload_list);
+        fnd_gfx_free_commands(frame->upload_list);
     }
     free(frames->frames);
     free(frames);
@@ -406,7 +406,7 @@ void cmg_arb_free_frames(cmg_arb_frames* frames) {
 typedef struct ui_upload_params {
     uint64_t                count;
     fnd_seg_upload_request* requests;
-    fnd_gfx_staging_memory* staging;
+    fnd_gfx_staging* staging;
     uint64_t                offset;
 } ui_upload_params;
 
@@ -415,7 +415,7 @@ static void ui_upload_record(void* raw_params) {
     uint64_t offset = 0;
     for (uint64_t i = 0; i < params->count; i++) {
         fnd_seg_upload_request req = params->requests[i];
-        fnd_gfx_tcmd_copy_staging_memory_to_buffer(
+        fnd_gfx_tcmd_copy_staging_to_buffer(
             params->staging, (fnd_gfx_buffer*)req.target,
             params->offset + offset, req.offset, req.bytes
         );
@@ -438,15 +438,15 @@ static void glyphs_rewrite_record(void* raw_params) {
 
 int cmg_arb_upload_cache(
     arb_upload_access   access,
-    cmg_arb_shared*         shared,
-    cmg_arb_frames*         frames,
+    cmg_arb_shared*     shared,
+    cmg_arb_frames*     frames,
     uint32_t            frame_idx,
     uint8_t             transfer_work_group_index,
-    uint8_t             command_list_allocator_index,
-    fnd_gfx_staging_memory* staging_memory,
-    uint64_t            staging_memory_region_offset,
-    uint64_t            staging_memory_region_size,
-    fnd_gfx_timeline*       signal_timeline,
+    uint8_t             commands_allocator_index,
+    fnd_gfx_staging*    staging,
+    uint64_t            staging_region_offset,
+    uint64_t            staging_region_size,
+    fnd_gfx_timeline*   signal_timeline,
     uint64_t            signal_value
 ) {
     fnd_gfx_hardware* hardware = shared->owning_hardware;
@@ -457,7 +457,7 @@ int cmg_arb_upload_cache(
 
     // Create segmenter
     fnd_seg_segmenter* segmenter = fnd_seg_create_segmenter(&(fnd_seg_segmenter_create_info){
-        .bandwidth = staging_memory_region_size
+        .bandwidth = staging_region_size
     }); if (!segmenter) goto _cleanup;
 
     // Free garbage text
@@ -493,7 +493,7 @@ int cmg_arb_upload_cache(
             if (!new_buffer) continue;
 
             // Rewrite contents
-            fnd_gfx_command_list* rewrite_list = fnd_gfx_create_command_list(hardware, &(fnd_gfx_command_list_create_info){
+            fnd_gfx_commands* rewrite_list = fnd_gfx_create_commands(hardware, &(fnd_gfx_commands_create_info){
                 .domain = fnd_gfx_command_domain_transfer,
                 .aindex = transfer_work_group_index,
                 .record = glyphs_rewrite_record,
@@ -504,8 +504,8 @@ int cmg_arb_upload_cache(
             });
 
             // Submit
-            fnd_gfx_command_list_submit(1, &rewrite_list, &(fnd_gfx_submit_info){.domain_work_group = 0});
-            fnd_gfx_hardware_wait_idle(hardware); fnd_gfx_free_command_list(rewrite_list);
+            fnd_gfx_commands_submit(1, &rewrite_list, &(fnd_gfx_submit_info){.domain_work_group = 0});
+            fnd_gfx_hardware_wait_idle(hardware); fnd_gfx_free_commands(rewrite_list);
 
             // Since rewrited, pick new buffer
             fnd_gfx_free_buffer(shared->glyph_buffer);
@@ -591,7 +591,7 @@ int cmg_arb_upload_cache(
 
             cmg_fnt_font* font_tex; if (!cmg_arb_injection_query_font(text_data.font, &font_tex)) continue;
             uint32_t texture_index = fnd_gfx_shader_resource_bind(
-                hardware, fnd_gfx_resource_type_sampled_texture, cmg_fnt_get_texture(font_tex), &success
+                hardware, fnd_gfx_resource_type_sampled_texture, cmg_fnt_font_get_texture(font_tex), &success
             );
 
             int signed_texture_index = -(int)texture_index; // is font
@@ -730,32 +730,32 @@ int cmg_arb_upload_cache(
         }
 
         // copy to staging memory
-        char* mapped = fnd_gfx_staging_memory_map(staging_memory, staging_memory_region_offset, staging_memory_region_size);
+        char* mapped = fnd_gfx_staging_map(staging, staging_region_offset, staging_region_size);
         uint64_t offset = 0;
         for (uint64_t i = 0; i < count; i++) {
             fnd_seg_upload_request req = requests[i];
             memcpy(mapped + offset, req.source, req.bytes);
             offset += req.bytes;
         }
-        fnd_gfx_staging_memory_unmap(staging_memory);
+        fnd_gfx_staging_unmap(staging);
 
         // record rewrite list
-        frame->upload_list = fnd_gfx_create_command_list(hardware, &(fnd_gfx_command_list_create_info){
+        frame->upload_list = fnd_gfx_create_commands(hardware, &(fnd_gfx_commands_create_info){
             .domain = fnd_gfx_command_domain_transfer,
-            .aindex = command_list_allocator_index,
+            .aindex = commands_allocator_index,
             .parent = frame->upload_list,
             .record = ui_upload_record,
             .params = &(ui_upload_params){
                 .count    = count,
                 .requests = requests,
-                .staging  = staging_memory,
-                .offset   = staging_memory_region_offset
+                .staging  = staging,
+                .offset   = staging_region_offset
             }
         });
 
         // Submit gpu work
         fnd_gfx_timeline* timeline = last_upload ? signal_timeline : internal;
-        fnd_gfx_command_list_submit(1, &frame->upload_list, &(fnd_gfx_submit_info){
+        fnd_gfx_commands_submit(1, &frame->upload_list, &(fnd_gfx_submit_info){
             .domain_work_group  = transfer_work_group_index,
             .signal_count       = timeline ? 1 : 0,
             .signal_timelines   = &timeline,
