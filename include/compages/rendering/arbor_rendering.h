@@ -121,12 +121,12 @@ void arb_injection_text_layout(
     gpu_glyph* glyphs = glyph_count ? malloc(sizeof(gpu_glyph) * glyph_count) : NULL;
 
     // Find font scale
-    const float font_scale = text_data->size / cmg_fnt_get_base_size(font);
+    const float font_scale = text_data->size / cmg_fnt_font_get_base_size(font);
 
     // Populate glyphs buffer
-    const float ascent      = cmg_fnt_get_base_ascent(font)   * font_scale;
-    const float descent     = cmg_fnt_get_base_descent(font)  * font_scale;
-    const float line_gap    = cmg_fnt_get_base_line_gap(font) * font_scale;
+    const float ascent      = cmg_fnt_font_get_base_ascent(font)   * font_scale;
+    const float descent     = cmg_fnt_font_get_base_descent(font)  * font_scale;
+    const float line_gap    = cmg_fnt_font_get_base_line_gap(font) * font_scale;
     const float line_height = ascent - descent + line_gap;
 
     float    pen_x      = 0.0f;
@@ -148,10 +148,10 @@ void arb_injection_text_layout(
         }
 
         // Kerning between consecutive glyphs on the same line
-        if (prev_cp) pen_x += cmg_fnt_get_kerning(font, prev_cp, cp);
+        if (prev_cp) pen_x += cmg_fnt_font_get_kerning(font, prev_cp, cp);
 
         // Write glyph
-        const cmg_fnt_glyph g = cmg_fnt_get_glyph(font, cp);
+        const cmg_fnt_glyph g = cmg_fnt_font_get_glyph(font, cp);
         glyphs[glyph_idx++] = (gpu_glyph){
             .atlas_position = g.atlas_position,
             .off_x          = pen_x + g.bearing_x * font_scale,
@@ -591,7 +591,7 @@ int cmg_arb_upload_cache(
 
             cmg_fnt_font* font_tex; if (!cmg_arb_injection_query_font(text_data.font, &font_tex)) continue;
             uint32_t texture_index = fnd_gfx_shader_resource_bind(
-                hardware, fnd_gfx_resource_type_sampled_texture, cmg_fnt_get_texture(font_tex), &success
+                hardware, fnd_gfx_resource_type_sampled_texture, cmg_fnt_font_get_texture(font_tex), &success
             );
 
             int signed_texture_index = -(int)texture_index; // is font
