@@ -22,8 +22,14 @@ Code info:
 #define COMPAGES_SYNCHRONISED_WINDOW_IMPL
 #include "compages/utility/synchronised_window.h"
 
-#define COMPAGES_UPLOADER_IMPL
-#include "compages/utility/staging_uploader.h"
+#define COMPAGES_STAGING_WAITER_IMPL
+#include "compages/staging/staging_waiter.h"
+
+#define COMPAGES_STAGING_UPLOADER_IMPL
+#include "compages/staging/staging_uploader.h"
+
+#define COMPAGES_REGISTRY_IMPL
+#include "compages/resources/registry.h"
 
 #else
 

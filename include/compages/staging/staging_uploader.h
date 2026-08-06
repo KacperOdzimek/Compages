@@ -1,51 +1,51 @@
-#ifndef COMPAGES_UPLOADER_H
-#define COMPAGES_UPLOADER_H
+#ifndef COMPAGES_STAGING_UPLOADER_H
+#define COMPAGES_STAGING_UPLOADER_H
 
 #include "fundatio/platform/graphics.h"
 #include <stdint.h>
 
-typedef void(*cmg_upl_memory_free_func)(void* memory);
+typedef void(*cmg_stu_memory_free_func)(void* memory);
 
-typedef struct cmg_upl_uploader_create_info {
+typedef struct cmg_stu_uploader_create_info {
     uint64_t staging_size_bytes;
     uint8_t  transfer_group_index;
     uint8_t  commands_allocator_index;
-} cmg_upl_uploader_create_info;
+} cmg_stu_uploader_create_info;
 
-typedef struct cmg_upl_uploader cmg_upl_uploader;
+typedef struct cmg_stu_uploader cmg_stu_uploader;
 
-cmg_upl_uploader* cmg_upl_create_uploader(fnd_gfx_hardware*, const cmg_upl_uploader_create_info*);
-void cmg_upl_free_uploader(cmg_upl_uploader*);
+cmg_stu_uploader* cmg_stu_create_uploader(fnd_gfx_hardware*, const cmg_stu_uploader_create_info*);
+void cmg_stu_free_uploader(cmg_stu_uploader*);
 
 // Schedules buffer upload
 // Returns non-zero at success
-// cmg_upl_uploader_timepoint is higher or equal to out_timepoint
+// cmg_stu_uploader_timepoint is higher or equal to out_timepoint
 // buffer is uploaded
-int cmg_upl_uploader_buffer_upload(
-    cmg_upl_uploader*, uint64_t bytes, void* memory, cmg_upl_memory_free_func free_func,
+int cmg_stu_uploader_buffer_upload(
+    cmg_stu_uploader*, uint64_t bytes, void* memory, cmg_stu_memory_free_func free_func,
     fnd_gfx_buffer* dest_buffer, uint64_t dest_offset, uint64_t* out_timepoint
 );
 
 // Schedules texture upload
 // Returns non-zero at success
-// cmg_upl_uploader_timepoint is higher or equal to out_timepoint
+// cmg_stu_uploader_timepoint is higher or equal to out_timepoint
 // texture is uploaded
-int cmg_upl_uploader_texture_upload(
-    cmg_upl_uploader*, uint64_t bytes, void* memory, cmg_upl_memory_free_func free_func,
+int cmg_stu_uploader_texture_upload(
+    cmg_stu_uploader*, uint64_t bytes, void* memory, cmg_stu_memory_free_func free_func,
     fnd_gfx_texture* dest_texture, fnd_gfx_texture_dimensions dest_offset, fnd_gfx_texture_dimensions dest_dim, uint64_t* out_timepoint
 );
 
 // Returns current timepoint
-uint64_t cmg_upl_uploader_timepoint(cmg_upl_uploader*);
+uint64_t cmg_stu_uploader_timepoint(cmg_stu_uploader*);
 
 // Enters uploader routine
 // If lock will wait for staging to be unused, and then begin copying
 // If not lock and staging is in use, returns instantly
-void cmg_upl_uploader_enter(cmg_upl_uploader*, int lock);
+void cmg_stu_uploader_enter(cmg_stu_uploader*, int lock);
 
 #endif // COMPAGES_UPLOADER_H
 
-#ifdef COMPAGES_UPLOADER_IMPL
+#ifdef COMPAGES_STAGING_UPLOADER_IMPL
 
 #include <stdlib.h>
 #include <string.h>
@@ -53,7 +53,7 @@ void cmg_upl_uploader_enter(cmg_upl_uploader*, int lock);
 typedef struct upload_request {
     uint64_t                            bytes;
     void*                               memory;
-    cmg_upl_memory_free_func            free_func;
+    cmg_stu_memory_free_func            free_func;
     int                                 is_buffer;
     uint64_t                            current_offset;
     uint64_t                            timepoint;
@@ -70,7 +70,7 @@ typedef struct upload_request {
     };
 } upload_request;
 
-struct cmg_upl_uploader {
+struct cmg_stu_uploader {
     fnd_gfx_hardware*   hardware;
     fnd_gfx_staging*    staging;
     fnd_gfx_commands*   commands;
@@ -92,13 +92,13 @@ static inline uint64_t min_u64(uint64_t a, uint64_t b) {
     return a < b ? a : b;
 }
 
-cmg_upl_uploader* cmg_upl_create_uploader(fnd_gfx_hardware* hardware, const cmg_upl_uploader_create_info* info) {
+cmg_stu_uploader* cmg_stu_create_uploader(fnd_gfx_hardware* hardware, const cmg_stu_uploader_create_info* info) {
     if (info->staging_size_bytes == 0) return NULL;
 
-    cmg_upl_uploader* uploader = malloc(sizeof(cmg_upl_uploader));
+    cmg_stu_uploader* uploader = malloc(sizeof(cmg_stu_uploader));
     if (!uploader) goto _fail;
 
-    *uploader = (cmg_upl_uploader){
+    *uploader = (cmg_stu_uploader){
         .hardware  = hardware,
         .transfer  = info->transfer_group_index,
         .allocator = info->commands_allocator_index,
@@ -122,11 +122,11 @@ cmg_upl_uploader* cmg_upl_create_uploader(fnd_gfx_hardware* hardware, const cmg_
     return uploader;
 
 _fail:
-    cmg_upl_free_uploader(uploader);
+    cmg_stu_free_uploader(uploader);
     return NULL;
 }
 
-void cmg_upl_free_uploader(cmg_upl_uploader* uploader) {
+void cmg_stu_free_uploader(cmg_stu_uploader* uploader) {
     if (!uploader) return;
 
     if (uploader->hardware)   fnd_gfx_hardware_wait_idle(uploader->hardware);
@@ -146,7 +146,7 @@ void cmg_upl_free_uploader(cmg_upl_uploader* uploader) {
     free(uploader);
 }
 
-static int enqueue_request(cmg_upl_uploader* uploader, upload_request req) {
+static int enqueue_request(cmg_stu_uploader* uploader, upload_request req) {
     if (uploader->count == uploader->capacity) {
         uint64_t new_cap = uploader->capacity * 2;
         upload_request* new_reqs = realloc(uploader->requests, sizeof(upload_request) * new_cap);
@@ -166,8 +166,8 @@ static int enqueue_request(cmg_upl_uploader* uploader, upload_request req) {
     return 1;
 }
 
-int cmg_upl_uploader_buffer_upload(
-    cmg_upl_uploader* uploader, uint64_t bytes, void* memory, cmg_upl_memory_free_func free_func,
+int cmg_stu_uploader_buffer_upload(
+    cmg_stu_uploader* uploader, uint64_t bytes, void* memory, cmg_stu_memory_free_func free_func,
     fnd_gfx_buffer* dest_buffer, uint64_t dest_offset, uint64_t* out_timepoint
 ) {
     upload_request req = {
@@ -184,8 +184,8 @@ int cmg_upl_uploader_buffer_upload(
     return 1;
 }
 
-int cmg_upl_uploader_texture_upload(
-    cmg_upl_uploader* uploader, uint64_t bytes, void* memory, cmg_upl_memory_free_func free_func,
+int cmg_stu_uploader_texture_upload(
+    cmg_stu_uploader* uploader, uint64_t bytes, void* memory, cmg_stu_memory_free_func free_func,
     fnd_gfx_texture* dest_texture, fnd_gfx_texture_dimensions dest_offset, fnd_gfx_texture_dimensions dest_dim, uint64_t* out_timepoint
 ) {
     upload_request req = {
@@ -202,12 +202,12 @@ int cmg_upl_uploader_texture_upload(
     return 1;
 }
 
-uint64_t cmg_upl_uploader_timepoint(cmg_upl_uploader* uploader) {
+uint64_t cmg_stu_uploader_timepoint(cmg_stu_uploader* uploader) {
     return fnd_gfx_timeline_get_value(uploader->uploads_tl);
 }
 
 typedef struct upload_record_params {
-    cmg_upl_uploader* uploader;
+    cmg_stu_uploader* uploader;
     uint64_t          items_to_remove;
     uint64_t          highest_completed_timepoint;
     uint64_t          bytes_written;
@@ -215,7 +215,7 @@ typedef struct upload_record_params {
 
 static void upload_commands_record(void* raw_params) {
     upload_record_params* params = raw_params;
-    cmg_upl_uploader* uploader = params->uploader;
+    cmg_stu_uploader* uploader = params->uploader;
 
     char* staging_map = (char*)fnd_gfx_staging_map(uploader->staging, 0, uploader->bandwidth);
     uint64_t offset = 0;
@@ -312,7 +312,7 @@ static void upload_commands_record(void* raw_params) {
     params->bytes_written = offset;
 }
 
-void cmg_upl_uploader_enter(cmg_upl_uploader* uploader, int lock) {
+void cmg_stu_uploader_enter(cmg_stu_uploader* uploader, int lock) {
     if (lock) fnd_gfx_timeline_wait(uploader->staging_tl, uploader->staging_it);
     else if (!fnd_gfx_timeline_is_after(uploader->staging_tl, uploader->staging_it)) return;
     if (uploader->count == 0) return;
@@ -343,4 +343,4 @@ void cmg_upl_uploader_enter(cmg_upl_uploader* uploader, int lock) {
     uploader->position = (uploader->position + params.items_to_remove) % uploader->capacity;
 }
 
-#endif // COMPAGES_UPLOADER_IMPL
+#endif // COMPAGES_STAGING_UPLOADER_IMPL
