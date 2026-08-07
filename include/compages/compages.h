@@ -37,6 +37,8 @@ Code info:
 #include "compages/rendering/arbor_rendering.h"
 #include "compages/resources/font.h"
 #include "compages/utility/synchronised_window.h"
-#include "compages/utility/staging_uploader.h"
+#include "compages/staging/staging_waiter.h"
+#include "compages/staging/staging_uploader.h"
+#include "compages/resources/registry.h"
 
 #endif
