@@ -91,9 +91,8 @@ void cmg_sww_free_window(cmg_sww_window* window) {
 }
 
 void cmg_sww_window_enter(cmg_sww_window* window, int lock) {
-    // This frame in flight
-    uint32_t frame_in_flight = window->in_flight_itr;
-    window->in_flight_itr = (window->in_flight_itr + 1) % window->in_flight;
+    uint32_t frame_in_flight = window->in_flight_itr;                                               // This frame in flight
+    uint32_t previ_in_flight = frame_in_flight == 0 ? window->in_flight - 1 : frame_in_flight - 1;  // Previous frame in flight
 
     if (lock) { // Wait for previous cycle to complete
         fnd_gfx_timeline_wait(window->timeline, window->presented[frame_in_flight]);
@@ -102,12 +101,15 @@ void cmg_sww_window_enter(cmg_sww_window* window, int lock) {
     }
 
     // Current timeline value
-    uint64_t iterator = window->presented[frame_in_flight];
+    uint64_t iterator = window->presented[previ_in_flight];
 
     // Acquire next window attachment index
     uint32_t attachment; if (!fnd_gfx_window_acquire_index(
         window->window, window->timeline, ++iterator, &attachment)
     ) return;
+
+    // Reset waits after previous frame
+    window->wait_count = 0;
 
     // Always wait window acquired before presenting
     cmg_sww_window_add_wait(window, window->timeline, iterator);
@@ -126,6 +128,9 @@ void cmg_sww_window_enter(cmg_sww_window* window, int lock) {
     fnd_gfx_window_submit_present(
         window->window, attachment, window->wait_count, window->wait_timelines, window->wait_values
     ); window->presented[frame_in_flight] = iterator;
+
+    // Advance frame in flight
+    window->in_flight_itr = (window->in_flight_itr + 1) % window->in_flight;
 }
 
 void cmg_sww_window_add_wait(cmg_sww_window* window, fnd_gfx_timeline* timeline, uint64_t value) {
