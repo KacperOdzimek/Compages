@@ -6,7 +6,7 @@ This file provides simple system to render basic shapes: lines, triangles, recta
 ----------------------------------------------------------------
 Code info:
 - cmg_shp prefix
-- COMPAGES_SHAPES_IMPL macro to build
+- COMPAGES_SHAPES_RENDERING_IMPL macro to build
 - fundatio/graphics.h dependant
 - fundatio/linear_algebra.h dependant
 
@@ -119,7 +119,7 @@ void cmg_shp_circle(
 
 #endif // COMPAGES_SHAPES_H
 
-#ifdef COMPAGES_SHAPES_IMPL
+#ifdef COMPAGES_SHAPES_RENDERING_IMPL
 
 #include <stdlib.h>
 #include <string.h>
@@ -525,4 +525,4 @@ void cmg_shp_circle(cmg_shp_context* context, fnd_lia_vec2 center, float radius)
     );
 }
 
-#endif // COMPAGES_SHAPES_IMPL
+#endif // COMPAGES_SHAPES_RENDERING_IMPL
