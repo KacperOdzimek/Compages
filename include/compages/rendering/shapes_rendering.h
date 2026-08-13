@@ -293,16 +293,16 @@ static uint64_t min_u64(uint64_t l, uint64_t r) {
 }
 
 int cmg_shp_upload(
-    cmg_shp_context*       context,
+    cmg_shp_context*    context,
     uint8_t             transfer_work_group_index,
     uint8_t             commands_allocator_index,
-    fnd_gfx_staging* staging,
+    fnd_gfx_staging*    staging,
     uint64_t            staging_region_offset,
     uint64_t            staging_region_size,
-    fnd_gfx_timeline*       signal_timeline,
+    fnd_gfx_timeline*   signal_timeline,
     uint64_t            signal_value
 ) {
-    single_frame* frame    = &context->frames->frames[context->index];
+    single_frame*     frame  = &context->frames->frames[context->index];
     fnd_gfx_hardware* hardware = context->frames->owning_hardware;
 
     // Nothing to upload
@@ -376,7 +376,7 @@ int cmg_shp_upload(
             .domain_work_group  = transfer_work_group_index,
             .signal_count       = timeline ? 1 : 0,
             .signal_timelines   = &timeline,
-            .signal_values      = last_upload ? &signal_value    : (uint64_t[]){++internal_itr}
+            .signal_values      = last_upload ? &signal_value : (uint64_t[]){++internal_itr}
         });
 
         // Wait for upload to end

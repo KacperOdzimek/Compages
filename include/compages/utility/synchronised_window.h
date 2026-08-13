@@ -49,7 +49,7 @@ struct cmg_sww_window {
     uint32_t            in_flight;
     uint32_t            in_flight_itr;
     fnd_gfx_timeline*   timeline;
-    uint64_t*           presented;  // array per frame in flight
+    uint64_t*           rendered;  // Array per frame in flight
 
     uint32_t            wait_count;
     uint32_t            wait_capacity;
@@ -73,8 +73,8 @@ cmg_sww_window* cmg_sww_create_window(fnd_gfx_hardware* hardware, const cmg_sww_
         .initial_value = 0
     }); if (!window->timeline) goto _fail;
 
-    window->presented = calloc(window->in_flight, sizeof(uint64_t));
-    if (!window->presented) goto _fail;
+    window->rendered = calloc(window->in_flight, sizeof(uint64_t));
+    if (!window->rendered) goto _fail;
     
     return window;
 _fail: cmg_sww_free_window(window); return NULL;
@@ -86,7 +86,7 @@ void cmg_sww_free_window(cmg_sww_window* window) {
     fnd_gfx_free_timeline(window->timeline);
     free(window->wait_timelines);
     free(window->wait_values);
-    free(window->presented);
+    free(window->rendered);
     free(window);
 }
 
@@ -95,16 +95,16 @@ void cmg_sww_window_enter(cmg_sww_window* window, int lock) {
     uint32_t previ_in_flight = frame_in_flight == 0 ? window->in_flight - 1 : frame_in_flight - 1;  // Previous frame in flight
 
     if (lock) { // Wait for previous cycle to complete
-        fnd_gfx_timeline_wait(window->timeline, window->presented[frame_in_flight]);
+        fnd_gfx_timeline_wait(window->timeline, window->rendered[frame_in_flight]);
     } else {    // Check if completed, else opt-out
-        if (!fnd_gfx_timeline_is_after(window->timeline, window->presented[frame_in_flight])) return;
+        if (!fnd_gfx_timeline_is_after(window->timeline, window->rendered[frame_in_flight])) return;
     }
 
     // Current timeline value
-    uint64_t iterator = window->presented[previ_in_flight];
+    uint64_t iterator = window->rendered[previ_in_flight];
 
     // Acquire next window attachment index
-    uint32_t attachment; if (!fnd_gfx_window_acquire_index(
+    uint32_t attachment; if (!fnd_gfx_window_acquire(
         window->window, window->timeline, ++iterator, &attachment)
     ) return;
 
@@ -120,14 +120,14 @@ void cmg_sww_window_enter(cmg_sww_window* window, int lock) {
     // Fallback path: failed to push wait, wait hardware for safety
     if (window->wait_hardware) {
         fnd_gfx_hardware_wait_idle(window->owning_hardware);
-        fnd_gfx_window_submit_present(window->window, attachment, 0, NULL, NULL);
+        fnd_gfx_window_present(window->window, attachment, 0, NULL, NULL, NULL, 0);
         window->wait_hardware = 0; return;
     }
 
     // Present
-    fnd_gfx_window_submit_present(
-        window->window, attachment, window->wait_count, window->wait_timelines, window->wait_values
-    ); window->presented[frame_in_flight] = iterator;
+    fnd_gfx_window_present(
+        window->window, attachment, window->wait_count, window->wait_timelines, window->wait_values, window->timeline, ++iterator
+    ); window->rendered[frame_in_flight] = iterator;
 
     // Advance frame in flight
     window->in_flight_itr = (window->in_flight_itr + 1) % window->in_flight;
