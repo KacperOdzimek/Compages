@@ -6,7 +6,7 @@ This file provides simple system to render basic shapes: lines, triangles, recta
 ----------------------------------------------------------------
 Code info:
 - cmg_shp prefix
-- COMPAGES_SHAPES_IMPL macro to build
+- COMPAGES_SHAPES_RENDERING_IMPL macro to build
 - fundatio/graphics.h dependant
 - fundatio/linear_algebra.h dependant
 
@@ -119,7 +119,7 @@ void cmg_shp_circle(
 
 #endif // COMPAGES_SHAPES_H
 
-#ifdef COMPAGES_SHAPES_IMPL
+#ifdef COMPAGES_SHAPES_RENDERING_IMPL
 
 #include <stdlib.h>
 #include <string.h>
@@ -293,16 +293,16 @@ static uint64_t min_u64(uint64_t l, uint64_t r) {
 }
 
 int cmg_shp_upload(
-    cmg_shp_context*       context,
+    cmg_shp_context*    context,
     uint8_t             transfer_work_group_index,
     uint8_t             commands_allocator_index,
-    fnd_gfx_staging* staging,
+    fnd_gfx_staging*    staging,
     uint64_t            staging_region_offset,
     uint64_t            staging_region_size,
-    fnd_gfx_timeline*       signal_timeline,
+    fnd_gfx_timeline*   signal_timeline,
     uint64_t            signal_value
 ) {
-    single_frame* frame    = &context->frames->frames[context->index];
+    single_frame*     frame  = &context->frames->frames[context->index];
     fnd_gfx_hardware* hardware = context->frames->owning_hardware;
 
     // Nothing to upload
@@ -376,7 +376,7 @@ int cmg_shp_upload(
             .domain_work_group  = transfer_work_group_index,
             .signal_count       = timeline ? 1 : 0,
             .signal_timelines   = &timeline,
-            .signal_values      = last_upload ? &signal_value    : (uint64_t[]){++internal_itr}
+            .signal_values      = last_upload ? &signal_value : (uint64_t[]){++internal_itr}
         });
 
         // Wait for upload to end
@@ -525,4 +525,4 @@ void cmg_shp_circle(cmg_shp_context* context, fnd_lia_vec2 center, float radius)
     );
 }
 
-#endif // COMPAGES_SHAPES_IMPL
+#endif // COMPAGES_SHAPES_RENDERING_IMPL
