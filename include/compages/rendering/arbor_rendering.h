@@ -202,6 +202,8 @@ typedef struct gpu_draw_item {
     uint32_t        shader_index;
     int             rounding_pixel;
     float           r, g, b, a;
+    int             text_box_width;
+    int             text_box_height;
 } gpu_draw_item;
 
 typedef struct gpu_clipbox {
@@ -607,6 +609,8 @@ int cmg_arb_upload_cache(
                 .g              = (float)text_data.tint.g / 255.0f,
                 .b              = (float)text_data.tint.b / 255.0f,
                 .a              = (float)text_data.tint.a / 255.0f,
+                .text_box_width = req.layout->given_width,
+                .text_box_height= req.layout->given_height
             };
 
             instances_count += fnd_par_partition_query_size(part) / sizeof(gpu_glyph);

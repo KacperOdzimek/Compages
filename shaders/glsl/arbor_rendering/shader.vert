@@ -28,6 +28,8 @@ struct gpu_draw_item {
     uint   shader_index;
     int    rounding_pixel;
     float  r, g, b, a;
+    int    text_box_width;
+    int    text_box_height;
 };
 
 struct gpu_glyph {
@@ -98,27 +100,22 @@ void main() {
     if (inst.glyph != -1) {
         gpu_glyph glyph = glyphs_buffers[nonuniformEXT(pc.glyphs_buffer_index)].glyphs[inst.glyph];
 
-        vec2 text_box_size = vec2(
-            pc.resolution_width  * (abs(transform[0][0]) + abs(transform[0][1])),
-            pc.resolution_height * (abs(transform[1][0]) + abs(transform[1][1]))
-        );
-
         uv = mix(
             vec2(glyph.atlas_position.min_x, glyph.atlas_position.min_y),
             vec2(glyph.atlas_position.max_x, glyph.atlas_position.max_y),
             uv
         );
 
-        float pixel_to_norm_x = 2.0 / text_box_size.x;
-        float pixel_to_norm_y = 2.0 / text_box_size.y;
+        float pixel_to_norm_x = 2.0 / item.text_box_width;
+        float pixel_to_norm_y = 2.0 / item.text_box_height;
 
         mat3 local_transform = mat3(1.0);
 
         local_transform *= mat3(
             1.0, 0.0, 0.0,
             0.0, 1.0, 0.0,
-            -1.0 + (2.0 * glyph.off_x + glyph.size_x) / text_box_size.x,
-            -1.0 + (2.0 * glyph.off_y - glyph.size_y) / text_box_size.y,
+            -1.0 + (2.0 * glyph.off_x + glyph.size_x) / item.text_box_width,
+            -1.0 + (2.0 * glyph.off_y - glyph.size_y) / item.text_box_height,
             1.0
         );
 
