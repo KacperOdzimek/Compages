@@ -563,7 +563,7 @@ int cmg_arb_upload_cache(
         arb_draw_request req = access.draws_requests[i];
 
         if (req.is_box_not_text) {
-            int texture_index = 0; fnd_gfx_texture* texture; fnd_gfx_uv_2d uv;
+            int texture_index = 0; fnd_gfx_texture* texture; fnd_gfx_uv_2d uv = {0, 0, 1, 1};
             if (req.box.data.image && cmg_arb_injection_query_image(req.box.data.image, &texture, &uv)) {
                 texture_index = fnd_gfx_shader_resource_bind(
                     hardware, fnd_gfx_resource_type_sampled_texture, texture, &success
@@ -587,9 +587,16 @@ int cmg_arb_upload_cache(
             instances_count += 1;  // single box
         }
         else {
-            fnd_par_partition* part     = *req.text.pointer;
+            fnd_par_partition* part = *req.text.pointer;
             arb_text_data text_data =  req.text.data;
-            if (!part) continue;
+
+            // Invalid text partition - fall to 0-size box
+            if (!part) {
+                items[i] = (gpu_draw_item){
+                    .transform = (arb_mat3x2){0},
+                    .clipbox_index = -1
+                }; continue;
+            }
 
             cmg_fnt_font* font_tex; if (!cmg_arb_injection_query_font(text_data.font, &font_tex)) continue;
             uint32_t texture_index = fnd_gfx_shader_resource_bind(
