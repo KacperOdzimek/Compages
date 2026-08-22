@@ -98,7 +98,7 @@ void arb_injection_text_layout(
     int*                    out_height          // Out pixel height of text box
 ) {
     cmg_fnt_font* font; if (!cmg_arb_injection_query_font(text_data->font, &font)) return;
-    const char* text = text_data->text;
+    const char*   text = text_data->text;
 
     // If text empty or font invalid
     // Sent empty text request
@@ -452,7 +452,7 @@ int cmg_arb_upload_cache(
     uint64_t            signal_value
 ) {
     fnd_gfx_hardware* hardware = shared->owning_hardware;
-    single_frame* frame    = &frames->frames[frame_idx];
+    single_frame*     frame    = &frames->frames[frame_idx];
 
     // Function-wide success flag
     int success = 1;
