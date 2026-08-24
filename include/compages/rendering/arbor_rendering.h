@@ -97,7 +97,14 @@ void arb_injection_text_layout(
     int*                    out_width,          // Out pixel width of text box
     int*                    out_height          // Out pixel height of text box
 ) {
-    cmg_fnt_font* font; if (!cmg_arb_injection_query_font(text_data->font, &font)) return;
+    // Safety opt out
+    if (!text_data->style) {
+        *out_count  = 0; *out_glyphs = NULL;
+        *out_width  = 0; *out_height = 0;
+        return;
+    }
+
+    cmg_fnt_font* font; if (!cmg_arb_injection_query_font(text_data->style->font, &font)) return;
     const char*   text = text_data->text;
 
     // If text empty or font invalid
@@ -121,7 +128,7 @@ void arb_injection_text_layout(
     gpu_glyph* glyphs = glyph_count ? malloc(sizeof(gpu_glyph) * glyph_count) : NULL;
 
     // Find font scale
-    const float font_scale = text_data->size / cmg_fnt_font_get_base_size(font);
+    const float font_scale = text_data->style->size / cmg_fnt_font_get_base_size(font);
 
     // Populate glyphs buffer
     const float ascent      = cmg_fnt_font_get_base_ascent(font)   * font_scale;
@@ -588,7 +595,6 @@ int cmg_arb_upload_cache(
         }
         else {
             fnd_par_partition* part = *req.text.pointer;
-            arb_text_data text_data =  req.text.data;
 
             // Invalid text partition - fall to 0-size box
             if (!part) {
@@ -598,7 +604,7 @@ int cmg_arb_upload_cache(
                 }; continue;
             }
 
-            cmg_fnt_font* font_tex; if (!cmg_arb_injection_query_font(text_data.font, &font_tex)) continue;
+            cmg_fnt_font* font_tex; if (!cmg_arb_injection_query_font(req.text.font, &font_tex)) continue;
             uint32_t texture_index = fnd_gfx_shader_resource_bind(
                 hardware, fnd_gfx_resource_type_sampled_texture, cmg_fnt_font_get_texture(font_tex), &success
             );
@@ -611,11 +617,11 @@ int cmg_arb_upload_cache(
                 .atlas_position = (fnd_gfx_uv_2d){0, 0, 1, 1},
                 .texture_index  = signed_texture_index,
                 .clipbox_index  = req.clip_index,
-                .shader_index   = text_data.shader,
-                .r              = (float)text_data.tint.r / 255.0f,
-                .g              = (float)text_data.tint.g / 255.0f,
-                .b              = (float)text_data.tint.b / 255.0f,
-                .a              = (float)text_data.tint.a / 255.0f,
+                .shader_index   = req.text.shader,
+                .r              = (float)req.text.tint.r / 255.0f,
+                .g              = (float)req.text.tint.g / 255.0f,
+                .b              = (float)req.text.tint.b / 255.0f,
+                .a              = (float)req.text.tint.a / 255.0f,
                 .text_box_width = req.layout->given_width,
                 .text_box_height= req.layout->given_height
             };
